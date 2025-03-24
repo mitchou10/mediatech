@@ -1,0 +1,6 @@
+{
+    "LEGI": {
+        "download_url": "https://echanges.dila.gouv.fr/OPENDATA/LEGI/",
+        "download_folder": "data/legi"
+    }
+}
