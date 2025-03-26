@@ -1,1 +1,5 @@
 data/*
+logs/*
+test/
+.env
+__pycache__/
