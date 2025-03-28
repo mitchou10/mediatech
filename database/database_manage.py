@@ -9,7 +9,7 @@ logging.basicConfig(
 )
 
 
-def create_database(db_path):
+def create_database(db_path: str):
     if os.path.exists(db_path):
         logging.info(f"Database already exists at {db_path}")
         return
@@ -39,7 +39,7 @@ def create_database(db_path):
             logging.error(f"Error creating database at {db_path}: {e}")
 
 
-def insert_data(db_path, data):
+def insert_data(db_path: str, data: str):
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -52,40 +52,11 @@ def insert_data(db_path, data):
         )
         conn.commit()
         conn.close()
-        logging.info(f"Data inserted into database at {db_path}")
+        # logging.info(f"Data inserted into database at {db_path}")
     except Exception as e:
         logging.error(f"Error inserting data into database at {db_path}: {e}")
 
 
-if __name__ == "__main__":
-    data = [
-        (
-            "cid1",
-            "etat1",
-            "nature1",
-            "titre_court1",
-            "sous_titres1",
-            "numero1",
-            "date_debut1",
-            "date_fin1",
-            "titre1",
-            "nota1",
-            "contenu1",
-        ),
-        (
-            "cid2",
-            "etat2",
-            "nature2",
-            "titre_court2",
-            "sous_titres2",
-            "numero2",
-            "date_debut2",
-            "date_fin2",
-            "titre2",
-            "nota2",
-            "contenu2",
-        ),
-        # Ajoutez autant de lignes que nécessaire
-    ]
-    create_database("data/legi.db")
-    insert_data("data/legi.db", data)
+# if __name__ == "__main__":
+#     create_database("data/legi.db")
+    # insert_data("data/legi.db", data)

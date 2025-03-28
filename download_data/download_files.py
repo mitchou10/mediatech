@@ -13,22 +13,22 @@ logging.basicConfig(
 )
 
 
-def load_config(config_path):
-    with open(config_path, "r") as file:
+def load_config(config_file_path: str):
+    with open(config_file_path, "r") as file:
         return json.load(file)
 
 
-def load_log(log_path):
-    if os.path.exists(log_path):
-        with open(log_path, "r") as file:
+def load_data_history(data_history_path: str):
+    if os.path.exists(data_history_path):
+        with open(data_history_path, "r") as file:
             return json.load(file)
     else:
-        with open(log_path, "w") as file:
+        with open(data_history_path, "w") as file:
             json.dump({}, file)
         return {}
 
 
-def extract_and_remove_tar_files(download_folder):
+def extract_and_remove_tar_files(download_folder: str):
     if not os.path.exists(download_folder):
         logging.warning(f"Folder {download_folder} does not exist")
         return
@@ -49,9 +49,9 @@ def extract_and_remove_tar_files(download_folder):
                 logging.error(f"Error extracting or removing {file_path}: {e}")
 
 
-def download_files(config_file_path: str, log_file_path: str):
-    config = load_config(config_file_path)
-    log = load_log(log_file_path)
+def download_files(config_file_path: str, data_history_path: str):
+    config = load_config(config_file_path=config_file_path)
+    log = load_data_history(data_history_path=data_history_path)
 
     for key, data in config.items():
         url = config.get(key, {}).get("download_url", "")
@@ -70,14 +70,18 @@ def download_files(config_file_path: str, log_file_path: str):
             tar_gz_files = [
                 link["href"] for link in links if link["href"].endswith(".tar.gz")
             ]
-            logging.info(f"Found tar.gz files: {tar_gz_files}")
+            logging.info(
+                f"{len(tar_gz_files)} tar.gz files found in {url}: {tar_gz_files}"
+            )
 
             # Ensure the download folder exists
             os.makedirs(download_folder, exist_ok=True)
 
             if last_downloaded_file in tar_gz_files:
                 last_file_index = tar_gz_files.index(last_downloaded_file)
-                logging.info(f"Last downloaded file is {last_downloaded_file}")
+                logging.info(
+                    f"Last downloaded file is {last_downloaded_file} according to the data history"
+                )
             else:
                 last_file_index = -1
 
@@ -107,9 +111,11 @@ def download_files(config_file_path: str, log_file_path: str):
                     ),
                 }
 
-                with open(log_file_path, "w") as file:
+                with open(data_history_path, "w") as file:
                     json.dump(log, file, indent=4)
-                logging.info(f"Log config file successfully updated to {log_file_path}")
+                logging.info(
+                    f"Log config file successfully updated to {data_history_path}"
+                )
 
             extract_and_remove_tar_files(download_folder)
         except Exception as e:

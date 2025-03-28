@@ -1,19 +1,22 @@
-# albert_data_legi
+# Albert Data Legi
 
 ## Instructions
 
-### Télécharger les données
 
-Pour télécharger les données, exécutez le script `download_data.py` :
+### Installer les modules necessaires
 
 ```bash
-python download_data.py
+python -m venv .venv  # Créer l'environnement virtuel
+source .venv/bin/activate  # Activer l'environnement virtuel (Linux/Mac)
+pip install -r requirements.txt  # Installer les modules necessaires
 ```
 
-### Traiter les fichiers XML
+> Assurez-vous que l'environnement est correctement configuré.
 
-Pour traiter les fichiers XML et extraire les informations, exécutez le script `process_xml.py` :
+### Télécharger les données et créer la base de données SQL en local
+
+Exécutez le script `update_db.sh` :
 
 ```bash
-python process_xml.py
+source update_db.sh
 ```
