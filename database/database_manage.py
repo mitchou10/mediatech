@@ -1,6 +1,13 @@
-import sqlite3
+import psycopg2
+from psycopg2 import sql
 import logging
-import os
+from config import (
+    POSTGRES_DB,
+    POSTGRES_HOST,
+    POSTGRES_PORT,
+    POSTGRES_USER,
+    POSTGRES_PASSWORD,
+)
 
 logging.basicConfig(
     filename="logs/data.log",
@@ -9,16 +16,33 @@ logging.basicConfig(
 )
 
 
-def create_database(db_path: str):
-    if os.path.exists(db_path):
-        logging.info(f"Database already exists at {db_path}")
-        return
-    else:
-        try:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
+def create_table():
+    try:
+        conn = psycopg2.connect(
+            host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
+            dbname=POSTGRES_DB,
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD,
+        )
+        cursor = conn.cursor()
+
+        # Vérifier si la table existe déjà
+        cursor.execute("""
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_name = 'legi'
+            );
+        """)
+        table_exists = cursor.fetchone()[0]
+
+        if table_exists:
+            logging.info(f"Table 'LEGI' already exists in database {POSTGRES_DB}")
+        else:
+            # Créer la table si elle n'existe pas
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS LEGI (
+                CREATE TABLE LEGI (
                     cid TEXT PRIMARY KEY,
                     etat TEXT,
                     nature TEXT,
@@ -33,30 +57,46 @@ def create_database(db_path: str):
                 )
             """)
             conn.commit()
-            conn.close()
-            logging.info(f"Database created at {db_path}")
-        except Exception as e:
-            logging.error(f"Error creating database at {db_path}: {e}")
+            logging.info(f"Table 'LEGI' created successfully in database {POSTGRES_DB}")
+
+        conn.close()
+    except Exception as e:
+        logging.error(f"Error creating table in PostgreSQL: {e}")
 
 
-def insert_data(db_path: str, data: str):
+def insert_data(data: list):
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.executemany(
-            """
-            INSERT OR REPLACE INTO LEGI (cid, etat, nature, titre_court, sous_titres, numero, date_debut, date_fin, titre, nota, contenu)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            data,
+        conn = psycopg2.connect(
+            host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
+            dbname=POSTGRES_DB,
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD,
         )
+        cursor = conn.cursor()
+        insert_query = """
+            INSERT INTO LEGI (cid, etat, nature, titre_court, sous_titres, numero, date_debut, date_fin, titre, nota, contenu)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (cid) DO UPDATE SET
+            etat = EXCLUDED.etat,
+            nature = EXCLUDED.nature,
+            titre_court = EXCLUDED.titre_court,
+            sous_titres = EXCLUDED.sous_titres,
+            numero = EXCLUDED.numero,
+            date_debut = EXCLUDED.date_debut,
+            date_fin = EXCLUDED.date_fin,
+            titre = EXCLUDED.titre,
+            nota = EXCLUDED.nota,
+            contenu = EXCLUDED.contenu;
+        """
+        cursor.executemany(insert_query, data)
         conn.commit()
         conn.close()
-        # logging.info(f"Data inserted into database at {db_path}")
+        # logging.info(f"Data inserted into PostgreSQL database")
     except Exception as e:
-        logging.error(f"Error inserting data into database at {db_path}: {e}")
+        logging.error(f"Error inserting data into PostgreSQL: {e}")
 
 
-# if __name__ == "__main__":
-#     create_database("data/legi.db")
-    # insert_data("data/legi.db", data)
+if __name__ == "__main__":
+    # Create the table if does not exist
+    create_table()

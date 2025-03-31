@@ -22,7 +22,7 @@ def remove_folder(folder_path: str):
         logging.info(f"Folder {folder_path} does not exist")
 
 
-def process_xml_files(target_dir: str, db_path: str) -> list:
+def process_xml_files(target_dir: str) -> list:
     for root_dir, dirs, files in os.walk(target_dir):
         for file_name in files:
             if file_name.startswith("LEGIARTI") and file_name.endswith(".xml"):
@@ -87,14 +87,13 @@ def process_xml_files(target_dir: str, db_path: str) -> list:
                             nota_paragraphs,
                             paragraphs,
                         )
-                        insert_data(db_path, [new_data])  # Insert data immediately
+                        insert_data([new_data])  # Insert data immediately
 
                 except Exception as e:
                     logging.error(f"Error processing file {file_path}: {e}")
-    logging.info(f"Data in {target_dir} processed successfully")
 
 
-def get_data(base_folder: str, db_path: str):
+def get_data(base_folder: str):
     all_dirs = sorted(os.listdir(base_folder))
     try:
         all_dirs.remove("legi")
@@ -109,7 +108,6 @@ def get_data(base_folder: str, db_path: str):
             base_folder, root_dir, "legi/global/code_et_TNC_en_vigueur"
         )
         folder_to_remove = os.path.join(base_folder, root_dir)
-        print(f"{folder_to_remove} will be removed")
 
         if root_dir == "legi":
             # This is the freemium extracted folder
@@ -117,7 +115,7 @@ def get_data(base_folder: str, db_path: str):
             logging.info(f"Processing folder: {target_dir}")
             print(f"Processing folder: {target_dir}")
 
-            process_xml_files(target_dir=target_dir, db_path=db_path)
+            process_xml_files(target_dir=target_dir)
             logging.info(f"Folder: {target_dir} successfully processed")
 
             remove_folder(folder_path=folder_to_remove)
@@ -126,10 +124,11 @@ def get_data(base_folder: str, db_path: str):
             logging.info(f"Processing folder: {target_dir}")
             print(f"Processing folder: {target_dir}")
 
-            process_xml_files(target_dir=target_dir, db_path=db_path)
+            process_xml_files(target_dir=target_dir)
             logging.info(f"Folder: {target_dir} successfully processed")
 
             remove_folder(folder_path=folder_to_remove)
+
 
 # if __name__ == "__main__":
 #     base_folder = "data/legi"
