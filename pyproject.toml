@@ -16,8 +16,8 @@ dependencies = [
 ]
 
 [project.urls]
-Source = "https://github.com/etalab-ia/albert_data_legi"
-Documentation = "https://github.com/etalab-ia/albert_data_legi"
+Source = "https://github.com/etalab-ia/albert-data-dila"
+Documentation = "https://github.com/etalab-ia/albert-data-dila"
 
 [project.optional-dependencies]
 dev = [
