@@ -35,6 +35,8 @@ Ce projet traite les données publiques mises à disposition par la DILA (Direct
 
 3. Configurez les variables d'environnement dans un fichier `.env` :
    ```plaintext
+   CNIL_DATA_FOLDER=data/cnil
+   LEGI_DATA_FOLDER=data/legi
    POSTGRES_HOST=localhost
    POSTGRES_PORT=5432
    POSTGRES_DB=albert_data
