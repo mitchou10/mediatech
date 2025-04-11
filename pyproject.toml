@@ -1,0 +1,25 @@
+[project]
+name = "albert-data-dila"
+description = "ALBERT DATA : Traitement des données mis à disposition publiquement par la DILA afin d'alimenter la base de connaissance d'ALBERT"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+keywords = ["IA", "LLM", "ALBERT","DATA"]
+authors = [
+    {name = "Etalab", email = "etalab@modernisation.gouv.fr"}
+]
+version = "0.1.0"
+dependencies = [
+    "requests==2.32.3",
+    "beautifulsoup4==4.13.3",
+    "psycopg2==2.9.10",
+]
+
+[project.urls]
+Source = "https://github.com/etalab-ia/albert_data_legi"
+Documentation = "https://github.com/etalab-ia/albert_data_legi"
+
+[project.optional-dependencies]
+dev = [
+    "ruff"
+]

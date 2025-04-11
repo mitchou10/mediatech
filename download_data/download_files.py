@@ -14,14 +14,43 @@ logging.basicConfig(
 
 
 def load_config(config_file_path: str):
+    """
+    Load and parse a JSON configuration file.
+
+    Args:
+        config_file_path (str): Path to the JSON configuration file to be loaded.
+
+    Returns:
+        dict: The parsed JSON content as a Python dictionary.
+
+    Raises:
+        FileNotFoundError: If the specified configuration file doesn't exist.
+        json.JSONDecodeError: If the configuration file contains invalid JSON.
+    """
     with open(config_file_path, "r") as file:
         return json.load(file)
 
 
 def load_data_history(data_history_path: str):
+    """
+    Load the downloaded data history from a JSON file.
+    This function attempts to read and parse a JSON file at the specified path.
+
+    Parameters:
+        data_history_path (str): Path to the JSON file containing the data history.
+
+    Returns:
+        dict: The data history as a dictionary. Returns an empty dictionary if the file
+              does not exist, is empty, or contains invalid JSON.
+    """
     if os.path.exists(data_history_path):
         with open(data_history_path, "r") as file:
-            return json.load(file)
+            try:
+                data = json.load(file)
+                return data if data else {}
+            except json.JSONDecodeError:
+                logging.warning(f"File {data_history_path} is empty or invalid.")
+                return {}
     else:
         with open(data_history_path, "w") as file:
             json.dump({}, file)
@@ -29,6 +58,24 @@ def load_data_history(data_history_path: str):
 
 
 def extract_and_remove_tar_files(download_folder: str):
+    """
+    Extracts and removes all `.tar.gz` files in the specified folder.
+
+    This function checks if the given folder exists and is not empty. It then iterates
+    through all files in the folder, identifies files with a `.tar.gz` extension, 
+    extracts their contents into the same folder, and removes the original `.tar.gz` files.
+
+    Args:
+        download_folder (str): The path to the folder containing `.tar.gz` files.
+
+    Logs:
+        - A warning if the folder does not exist or is empty.
+        - Information about each `.tar.gz` file found, extracted, and removed.
+        - An error if there is an issue during extraction or removal.
+
+    Raises:
+        None: Any exceptions during extraction or removal are logged but not raised.
+    """
     if not os.path.exists(download_folder):
         logging.warning(f"Folder {download_folder} does not exist")
         return
@@ -50,6 +97,29 @@ def extract_and_remove_tar_files(download_folder: str):
 
 
 def download_files(config_file_path: str, data_history_path: str):
+    """
+    Downloads .tar.gz files from URLs specified in the configuration file, tracks download history, 
+    and extracts the downloaded archives.
+    
+    The function performs the following steps:
+    1. Loads configuration and download history from the provided file paths
+    2. For each entry in the configuration:
+       - Retrieves the download URL and target folder
+       - Fetches the webpage and parses it to find .tar.gz files
+       - Prioritizes files with 'freemium' in the name
+       - Checks which files have already been downloaded
+       - Downloads only new files that are uploaded after the last one downloaded, according to the data history
+       - Updates the data history after successful downloads
+       - Extracts the downloaded .tar.gz files and removes the archives
+    
+    Args:
+        config_file_path (str): Path to the configuration file containing download URLs and folders
+        data_history_path (str): Path to the file tracking download history
+        
+    Raises:
+        Various exceptions during web requests, file operations, or parsing
+        All exceptions are caught, logged, and don't halt execution of subsequent downloads
+    """
     config = load_config(config_file_path=config_file_path)
     log = load_data_history(data_history_path=data_history_path)
 
@@ -67,9 +137,25 @@ def download_files(config_file_path: str, data_history_path: str):
 
             # Find all links that end with ".tar.gz"
             links = soup.find_all("a", href=True)
-            tar_gz_files = [
-                link["href"] for link in links if link["href"].endswith(".tar.gz")
-            ]
+
+            tar_gz_files = sorted(
+                [link["href"] for link in links if link["href"].endswith(".tar.gz")]
+            )
+            # Placing the freemium file at the beginning
+            try:
+                freemium_file = next(
+                    (
+                        file
+                        for file in tar_gz_files
+                        if file.lower().startswith("freemium")
+                    ),
+                    None,
+                )
+                tar_gz_files.remove(freemium_file)
+                tar_gz_files.insert(0, freemium_file)
+            except ValueError:
+                logging.info(f"There is no freemium file in {url}")
+
             logging.info(
                 f"{len(tar_gz_files)} tar.gz files found in {url}: {tar_gz_files}"
             )

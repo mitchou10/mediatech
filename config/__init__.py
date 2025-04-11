@@ -1,4 +1,5 @@
 from .config import (
+    CNIL_DATA_FOLDER,
     LEGI_DATA_FOLDER,
     config_file_path,
     data_history_path,

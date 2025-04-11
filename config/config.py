@@ -14,4 +14,5 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "password")
 # Paths for configuration and data history
 config_file_path = "config/data_config.json"
 data_history_path = "config/data_history.json"
-LEGI_DATA_FOLDER = "data/legi"
+LEGI_DATA_FOLDER = os.getenv("LEGI_DATA_FOLDER", "data/legi")
+CNIL_DATA_FOLDER = os.getenv("CNIL_DATA_FOLDER", "data/cnil")

@@ -2,5 +2,9 @@
     "LEGI": {
         "download_url": "https://echanges.dila.gouv.fr/OPENDATA/LEGI/",
         "download_folder": "data/legi"
+    },
+    "CNIL": {
+        "download_url": "https://echanges.dila.gouv.fr/OPENDATA/CNIL/",
+        "download_folder": "data/cnil"
     }
 }
