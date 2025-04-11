@@ -2,7 +2,7 @@
 
 ## Description
 
-Ce projet traite les données publiques mises à disposition par la DILA (Direction de l'information légale et administrative) pour alimenter la base de connaissance d'ALBERT. Il inclut des scripts pour télécharger, traiter et insérer ces données dans une base PostgreSQL et base de donnée vectorielle.
+Ce projet traite les données publiques mises à disposition par la DILA (Direction de l'information légale et administrative) pour alimenter la base de connaissance d'ALBERT. Il inclut des scripts pour télécharger, traiter et insérer ces données dans une base PostgreSQL et base de donnée vectorielle (to do).
 
 ## Instructions
 
