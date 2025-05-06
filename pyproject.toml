@@ -1,9 +1,9 @@
 [project]
 name = "albert-data-dila"
-description = "ALBERT DATA : Traitement des données mis à disposition publiquement par la DILA afin d'alimenter la base de connaissance d'ALBERT"
+description = "ALBERT BIBLIOTHEQUE : Traitement des données mis à disposition publiquement par la DILA afin d'alimenter la base de connaissance d'ALBERT et de faciliter l'accès aux données publiques vectorisées dans la fonction publique."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
 keywords = ["IA", "LLM", "ALBERT","DATA"]
 authors = [
     {name = "Etalab", email = "etalab@modernisation.gouv.fr"}
@@ -13,6 +13,12 @@ dependencies = [
     "requests==2.32.3",
     "beautifulsoup4==4.13.3",
     "psycopg2==2.9.10",
+    "dotenv==0.9.9",
+    "openai==1.75.0",
+    "langchain-text-splitters==0.3.8",
+    "wget==3.2",
+    "polars==1.29.0",
+    "fastembed==0.6.1",
 ]
 
 [project.urls]

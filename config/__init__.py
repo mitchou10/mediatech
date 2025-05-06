@@ -1,6 +1,10 @@
 from .config import (
     CNIL_DATA_FOLDER,
     LEGI_DATA_FOLDER,
+    CONSTIT_DATA_FOLDER,
+    DIRECTORIES_FOLDER,
+    DOLE_DATA_FOLDER,
+    parquet_files_folder,
     config_file_path,
     data_history_path,
     POSTGRES_HOST,
@@ -8,4 +12,6 @@ from .config import (
     POSTGRES_DB,
     POSTGRES_USER,
     POSTGRES_PASSWORD,
+    STAGGING_URL,
+    STAGGING_API_KEY,
 )

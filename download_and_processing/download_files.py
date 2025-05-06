@@ -1,10 +1,13 @@
-import requests
+from datetime import datetime
+from urllib.request import urlopen
 from bs4 import BeautifulSoup
 import os
+import requests
 import json
-from datetime import datetime
 import tarfile
 import logging
+import shutil
+import wget
 
 logging.basicConfig(
     filename="logs/data.log",
@@ -62,7 +65,7 @@ def extract_and_remove_tar_files(download_folder: str):
     Extracts and removes all `.tar.gz` files in the specified folder.
 
     This function checks if the given folder exists and is not empty. It then iterates
-    through all files in the folder, identifies files with a `.tar.gz` extension, 
+    through all files in the folder, identifies files with a `.tar.gz` extension,
     extracts their contents into the same folder, and removes the original `.tar.gz` files.
 
     Args:
@@ -98,34 +101,76 @@ def extract_and_remove_tar_files(download_folder: str):
 
 def download_files(config_file_path: str, data_history_path: str):
     """
-    Downloads .tar.gz files from URLs specified in the configuration file, tracks download history, 
-    and extracts the downloaded archives.
-    
-    The function performs the following steps:
-    1. Loads configuration and download history from the provided file paths
-    2. For each entry in the configuration:
-       - Retrieves the download URL and target folder
-       - Fetches the webpage and parses it to find .tar.gz files
-       - Prioritizes files with 'freemium' in the name
-       - Checks which files have already been downloaded
-       - Downloads only new files that are uploaded after the last one downloaded, according to the data history
-       - Updates the data history after successful downloads
-       - Extracts the downloaded .tar.gz files and removes the archives
-    
+    Downloads, unpacks, and processes data files as specified in a configuration file.
+
+    This function performs the following steps:
+    1. Loads configuration and data history from the specified file paths.
+    2. Cleans and prepares download directories as defined in the configuration.
+    3. Downloads and unpacks archives for each 'directory' type data file, retaining only JSON files and renaming them appropriately.
+    4. For each entry in the "DILA" section of the configuration:
+        - Scrapes the download page for available ".tar.gz" files.
+        - Prioritizes downloading "freemium" files if present.
+        - Downloads new archives not previously downloaded, updates the data history log, and extracts the archives.
+    5. Handles errors and logs progress throughout the process.P
+
     Args:
-        config_file_path (str): Path to the configuration file containing download URLs and folders
-        data_history_path (str): Path to the file tracking download history
-        
+        config_file_path (str): Path to the configuration JSON file specifying download URLs and directories.
+        data_history_path (str): Path to the JSON file maintaining download history for incremental updates.
+
     Raises:
-        Various exceptions during web requests, file operations, or parsing
-        All exceptions are caught, logged, and don't halt execution of subsequent downloads
+        Exception: Logs and handles any exceptions that occur during the download or extraction process.
     """
+
     config = load_config(config_file_path=config_file_path)
     log = load_data_history(data_history_path=data_history_path)
 
-    for key, data in config.items():
-        url = config.get(key, {}).get("download_url", "")
-        download_folder = config.get(key, {}).get("download_folder", "")
+    # Cleaning directories folder once before processing
+    for file_name, attributes in config["directories"].items():
+        storage_dir = attributes.get("download_folder", "")
+        if os.path.exists(storage_dir):
+            shutil.rmtree(storage_dir)
+        os.makedirs(storage_dir, exist_ok=True)
+        logging.info(f"Directory {storage_dir} cleaned...")
+
+    for file_name, attributes in config["directories"].items():
+        old_files = os.listdir(storage_dir)
+
+        logging.info(f"downloading {file_name} archive...")
+        url = requests.head(attributes["download_url"], allow_redirects=True).url
+        info = urlopen(url).info()
+        file = info.get_filename() if info.get_filename() else os.path.basename(url)
+
+        try:
+            wget.download(attributes["download_url"], os.path.join(storage_dir, file))
+        except Exception as e:
+            logging.error(f"Error downloading files: {e}")
+
+        logging.info(f"unpacking {file_name} archive...")
+        shutil.unpack_archive(os.path.join(storage_dir, file), storage_dir)
+
+        logging.info(f"deleting {file_name} archive...")
+        os.remove((os.path.join(storage_dir, file)))
+
+        new_files = [x for x in os.listdir(storage_dir) if x not in old_files]
+        logging.debug(f"new files: {new_files}")
+
+        for file in new_files:
+            if not file.endswith(".json"):
+                logging.debug(f"deleting {file}...")
+                os.remove(os.path.join(storage_dir, file))
+
+            else:
+                logging.debug(f"renaming {file} to {file_name}...")
+                os.rename(
+                    os.path.join(storage_dir, file),
+                    os.path.join(storage_dir, f"{file_name}.json"),
+                )
+
+        logging.info("Directories successfully downloaded")
+
+    for key, data in config["DILA"].items():
+        url = config["DILA"].get(key, {}).get("download_url", "")
+        download_folder = config["DILA"].get(key, {}).get("download_folder", "")
         last_downloaded_file = log.get(key, {}).get("last_downloaded_file", "")
 
         try:

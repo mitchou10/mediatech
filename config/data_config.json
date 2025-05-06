@@ -1,10 +1,30 @@
 {
-    "LEGI": {
-        "download_url": "https://echanges.dila.gouv.fr/OPENDATA/LEGI/",
-        "download_folder": "data/legi"
+    "DILA":{
+        "CNIL": {
+            "download_url": "https://echanges.dila.gouv.fr/OPENDATA/CNIL/",
+            "download_folder": "data/cnil"
+        },
+        "CONSTIT": {
+            "download_url": "https://echanges.dila.gouv.fr/OPENDATA/CONSTIT/",
+            "download_folder": "data/constit"
+        },
+        "DOLE": {
+            "download_url": "https://echanges.dila.gouv.fr/OPENDATA/DOLE/",
+            "download_folder": "data/dole"
+        },
+        "LEGI": {
+            "download_url": "https://echanges.dila.gouv.fr/OPENDATA/LEGI/",
+            "download_folder": "data/legi"
+        }
     },
-    "CNIL": {
-        "download_url": "https://echanges.dila.gouv.fr/OPENDATA/CNIL/",
-        "download_folder": "data/cnil"
+    "directories": {
+        "local_directory": {
+            "download_url": "https://lecomarquage.service-public.fr/donnees_locales_v4/all_latest.tar.bz2",
+            "download_folder": "data/directories"
+        },
+        "national_directory": {
+            "download_url": "https://echanges.dila.gouv.fr/OPENDATA/RefOrgaAdminEtat/FluxAnneeCourante/dila_refOrga_admin_Etat_fr_latest.zip",
+            "download_folder": "data/directories"
+        }
     }
 }
