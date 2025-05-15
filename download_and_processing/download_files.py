@@ -2,12 +2,11 @@ from datetime import datetime
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
 from urllib.error import HTTPError
+from utils import extract_and_remove_tar_files, load_data_history, load_config
 from config import get_logger
 import os
 import requests
 import json
-import tarfile
-import logging
 import shutil
 import wget
 
@@ -18,88 +17,6 @@ import wget
 #     format="%(asctime)s - %(levelname)s - %(message)s",
 # )
 logger = get_logger(__name__)
-
-def load_config(config_file_path: str):
-    """
-    Load and parse a JSON configuration file.
-
-    Args:
-        config_file_path (str): Path to the JSON configuration file to be loaded.
-
-    Returns:
-        dict: The parsed JSON content as a Python dictionary.
-
-    Raises:
-        FileNotFoundError: If the specified configuration file doesn't exist.
-        json.JSONDecodeError: If the configuration file contains invalid JSON.
-    """
-    with open(config_file_path, "r") as file:
-        return json.load(file)
-
-
-def load_data_history(data_history_path: str):
-    """
-    Load the downloaded data history from a JSON file.
-    This function attempts to read and parse a JSON file at the specified path.
-
-    Parameters:
-        data_history_path (str): Path to the JSON file containing the data history.
-
-    Returns:
-        dict: The data history as a dictionary. Returns an empty dictionary if the file
-              does not exist, is empty, or contains invalid JSON.
-    """
-    if os.path.exists(data_history_path):
-        with open(data_history_path, "r") as file:
-            try:
-                data = json.load(file)
-                return data if data else {}
-            except json.JSONDecodeError:
-                logger.warning(f"File {data_history_path} is empty or invalid.")
-                return {}
-    else:
-        with open(data_history_path, "w") as file:
-            json.dump({}, file)
-        return {}
-
-
-def extract_and_remove_tar_files(download_folder: str):
-    """
-    Extracts and removes all `.tar.gz` files in the specified folder.
-
-    This function checks if the given folder exists and is not empty. It then iterates
-    through all files in the folder, identifies files with a `.tar.gz` extension,
-    extracts their contents into the same folder, and removes the original `.tar.gz` files.
-
-    Args:
-        download_folder (str): The path to the folder containing `.tar.gz` files.
-
-    Logs:
-        - A warning if the folder does not exist or is empty.
-        - Information about each `.tar.gz` file found, extracted, and removed.
-        - An error if there is an issue during extraction or removal.
-
-    Raises:
-        None: Any exceptions during extraction or removal are logged but not raised.
-    """
-    if not os.path.exists(download_folder):
-        logger.warning(f"Folder {download_folder} does not exist")
-        return
-    if not os.listdir(download_folder):
-        logger.warning(f"Folder {download_folder} is empty")
-        return
-    for file_name in os.listdir(download_folder):
-        if file_name.endswith(".tar.gz"):
-            logger.info(f"Found {file_name}")
-            file_path = os.path.join(download_folder, file_name)
-            logger.info(f"Extracting {file_path}")
-            try:
-                with tarfile.open(file_path, "r:gz") as tar:
-                    tar.extractall(path=download_folder)
-                os.remove(file_path)
-                logger.info(f"Removed {file_path}")
-            except Exception as e:
-                logger.error(f"Error extracting or removing {file_path}: {e}")
 
 
 def download_files(config_file_path: str, data_history_path: str):
@@ -205,7 +122,7 @@ def download_files(config_file_path: str, data_history_path: str):
             except Exception as e:
                 logger.error(f"Error downloading files: {e}")
 
-        elif file_name.lower().endswith("directory"):
+        elif attributes.get("type") == "directory":
             storage_dir = attributes.get("download_folder", "")
             os.makedirs(storage_dir, exist_ok=True)
             old_files = os.listdir(storage_dir)
@@ -231,21 +148,21 @@ def download_files(config_file_path: str, data_history_path: str):
             new_files = [x for x in os.listdir(storage_dir) if x not in old_files]
             logger.debug(f"new files: {new_files}")
 
-            for new_file in new_files:
-                if not file.endswith(".json"):
-                    logger.debug(f"deleting {new_file}...")
-                    os.remove(os.path.join(storage_dir, new_file))
+            for downloaded_file in new_files:
+                if not downloaded_file.endswith(".json"):
+                    logger.debug(f"deleting {downloaded_file}...")
+                    os.remove(os.path.join(storage_dir, downloaded_file))
 
                 else:
-                    logger.debug(f"renaming {new_file} to {file_name}...")
+                    logger.debug(f"renaming {downloaded_file} to {file_name}.json...")
                     os.rename(
-                        os.path.join(storage_dir, new_file),
+                        os.path.join(storage_dir, downloaded_file),
                         os.path.join(storage_dir, f"{file_name}.json"),
                     )
 
                     # Update the last download file and date in the log
                     log[file_name] = {
-                        "last_downloaded_file": new_file,
+                        "last_downloaded_file": downloaded_file,
                         "last_download_date": datetime.now().strftime(
                             "%d-%m-%Y %H:%M:%S.%f"
                         ),
@@ -257,9 +174,9 @@ def download_files(config_file_path: str, data_history_path: str):
                         f"Log config file successfully updated to {data_history_path}"
                     )
 
-            logger.info("Directories successfully downloaded")
+            logger.info(f"{file_name} successfully downloaded")
 
-        else: # Mainly for sheets files 
+        elif attributes.get("type") == "sheets":
             # Downloading the rest of the files (fork of the pyalbert.corpus.download_rag_sources function)
             storage_dir = attributes.get("download_folder", "")
 
@@ -275,7 +192,7 @@ def download_files(config_file_path: str, data_history_path: str):
                 old_name = wget.download(
                     attributes.get("download_url"), out=storage_dir
                 )
-                shutil.move(old_name, filename_tmp)
+                shutil.move(old_name, filename_tmp)  # Renaming the file to temp
             except HTTPError as err:
                 logger.error(f"Error: {err}")
                 logger.error(
@@ -285,6 +202,9 @@ def download_files(config_file_path: str, data_history_path: str):
 
             url = requests.head(attributes["download_url"], allow_redirects=True).url
             info = urlopen(url).info()
+            downloaded_file_name = (
+                info.get_filename() if info.get_filename() else os.path.basename(url)
+            )
             content_type = info.get_content_type().split("/")[-1]
             if content_type in ["zip"]:  # List can be extended with other formats
                 if os.path.exists(target):
@@ -294,11 +214,13 @@ def download_files(config_file_path: str, data_history_path: str):
                 )
             else:
                 target = f"{target}.{old_name.split('.')[-1]}"
-                shutil.move(filename_tmp, target) # Renaming the file with the correct extension
+                shutil.move(
+                    filename_tmp, target
+                )  # Renaming the file with the correct extension
 
             # Update the last download file and date in the log
             log[file_name] = {
-                "last_downloaded_file": f"temp_{file_name}",
+                "last_downloaded_file": f"{downloaded_file_name}",
                 "last_download_date": datetime.now().strftime("%d-%m-%Y %H:%M:%S.%f"),
             }
 
@@ -307,6 +229,8 @@ def download_files(config_file_path: str, data_history_path: str):
             logger.info(f"Log config file successfully updated to {data_history_path}")
 
             logger.info(f"Corpus files {file_name} successfuly downloaded")
+        else:
+            logger.warning(f"Unknown type {attributes.get('type')} for {file_name}")
 
 
 # def download_files(config_file_path: str, data_history_path: str):

@@ -31,14 +31,17 @@
     },
     "service_public_part": {
         "download_url": "https://lecomarquage.service-public.fr/vdd/3.4/part/zip/vosdroits-latest.zip",
-        "download_folder": "data/unprocessed/service_public_part"
+        "download_folder": "data/unprocessed/service_public_part",
+        "type": "sheets"
     },
     "service_public_pro": {
         "download_url": "https://lecomarquage.service-public.fr/vdd/3.4/pro/zip/vosdroits-latest.zip",
-        "download_folder": "data/unprocessed/service_public_pro"
+        "download_folder": "data/unprocessed/service_public_pro",
+        "type": "sheets"
     },
     "travail_emploi": {
         "download_url": "https://github.com/SocialGouv/fiches-travail-data/raw/master/data/fiches-travail.json",
-        "download_folder": "data/unprocessed/travail_emploi"
+        "download_folder": "data/unprocessed/travail_emploi",
+        "type": "sheets"
     }
 }

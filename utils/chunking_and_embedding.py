@@ -63,7 +63,9 @@ class CorpusHandler(ABC):
     ) -> Generator[tuple[list], None, None]:
         desc = f"Processing corpus {self._name} with embeddings..."
         for batch in self.iter_docs(batch_size=batch_size, desc=desc):
-            batch_embeddings = generate_embeddings([self.doc_to_chunk(x) for x in batch])
+            batch_embeddings = generate_embeddings(
+                [self.doc_to_chunk(x) for x in batch]
+            )
             if len([x for x in batch_embeddings if x is not None]) == 0:
                 continue
             yield batch, batch_embeddings
@@ -102,6 +104,7 @@ class SheetChunksHandler(CorpusHandler):
         text = "\n".join([doc["title"] + context, doc["introduction"], doc["text"]])
         return text
 
+
 # def embed(data: None | str | list[str]) -> None | list:
 #     if data is None:
 #         return None
@@ -128,7 +131,8 @@ class SheetChunksHandler(CorpusHandler):
 
 #     # Fall back to single data input
 #     return LlmClient.create_embeddings(data)
-    
+
+
 def generate_embeddings(data: str | list[str], model: str = "BAAI/bge-m3"):
     """
     Generates embeddings for a given text using a specified model.
@@ -151,7 +155,7 @@ def generate_embeddings(data: str | list[str], model: str = "BAAI/bge-m3"):
         input=data, model=model, encoding_format="float"
     )
     embeddings = [item.embedding for item in vector.data]
-    
+
     return embeddings
     # if isinstance(data, str):
     #     return embeddings[0]
@@ -340,5 +344,3 @@ def make_questions(storage_dir: str) -> None:
     with open(q_fn, mode="w", encoding="utf-8") as f:
         json.dump(questions, f, ensure_ascii=False, indent=4)
     print("Questions created in", q_fn)
-
-

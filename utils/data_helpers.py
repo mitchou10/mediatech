@@ -2,6 +2,7 @@ import os
 import shutil
 import re
 import json
+import tarfile
 import polars as pl
 import psycopg2
 from datetime import datetime
@@ -17,6 +18,89 @@ from config import (
 )
 
 logger = get_logger(__name__)
+
+
+def load_config(config_file_path: str):
+    """
+    Load and parse a JSON configuration file.
+
+    Args:
+        config_file_path (str): Path to the JSON configuration file to be loaded.
+
+    Returns:
+        dict: The parsed JSON content as a Python dictionary.
+
+    Raises:
+        FileNotFoundError: If the specified configuration file doesn't exist.
+        json.JSONDecodeError: If the configuration file contains invalid JSON.
+    """
+    with open(config_file_path, "r") as file:
+        return json.load(file)
+
+
+def load_data_history(data_history_path: str):
+    """
+    Load the downloaded data history from a JSON file.
+    This function attempts to read and parse a JSON file at the specified path.
+
+    Parameters:
+        data_history_path (str): Path to the JSON file containing the data history.
+
+    Returns:
+        dict: The data history as a dictionary. Returns an empty dictionary if the file
+              does not exist, is empty, or contains invalid JSON.
+    """
+    if os.path.exists(data_history_path):
+        with open(data_history_path, "r") as file:
+            try:
+                data = json.load(file)
+                return data if data else {}
+            except json.JSONDecodeError:
+                logger.warning(f"File {data_history_path} is empty or invalid.")
+                return {}
+    else:
+        with open(data_history_path, "w") as file:
+            json.dump({}, file)
+        return {}
+
+
+def extract_and_remove_tar_files(download_folder: str):
+    """
+    Extracts and removes all `.tar.gz` files in the specified folder.
+
+    This function checks if the given folder exists and is not empty. It then iterates
+    through all files in the folder, identifies files with a `.tar.gz` extension,
+    extracts their contents into the same folder, and removes the original `.tar.gz` files.
+
+    Args:
+        download_folder (str): The path to the folder containing `.tar.gz` files.
+
+    Logs:
+        - A warning if the folder does not exist or is empty.
+        - Information about each `.tar.gz` file found, extracted, and removed.
+        - An error if there is an issue during extraction or removal.
+
+    Raises:
+        None: Any exceptions during extraction or removal are logged but not raised.
+    """
+    if not os.path.exists(download_folder):
+        logger.warning(f"Folder {download_folder} does not exist")
+        return
+    if not os.listdir(download_folder):
+        logger.warning(f"Folder {download_folder} is empty")
+        return
+    for file_name in os.listdir(download_folder):
+        if file_name.endswith(".tar.gz"):
+            logger.info(f"Found {file_name}")
+            file_path = os.path.join(download_folder, file_name)
+            logger.info(f"Extracting {file_path}")
+            try:
+                with tarfile.open(file_path, "r:gz") as tar:
+                    tar.extractall(path=download_folder)
+                os.remove(file_path)
+                logger.info(f"Removed {file_path}")
+            except Exception as e:
+                logger.error(f"Error extracting or removing {file_path}: {e}")
 
 
 def format_time(time: str) -> str:

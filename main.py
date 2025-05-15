@@ -26,10 +26,10 @@ logger = get_logger(__name__)
 
 if __name__ == "__main__":
     # Download files
-    # download_files(
-    #     config_file_path=config_file_path,
-    #     data_history_path=data_history_path,
-    # )
+    download_files(
+        config_file_path=config_file_path,
+        data_history_path=data_history_path,
+    )
 
     # # Create the tables if they do not exist
     create_tables(delete_existing=False)

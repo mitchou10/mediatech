@@ -579,9 +579,18 @@ class RagSource:
             sheets.extend(_parse_xml(target_dir, "text", structured=structured))
         elif storage_dir == TRAVAIL_EMPLOI_DATA_FOLDER:
             base_name = os.path.basename(storage_dir)
-            target_dir = next((os.path.join(storage_dir, f) for f in os.listdir(storage_dir) if f.startswith(base_name)), None)
+            target_dir = next(
+                (
+                    os.path.join(storage_dir, f)
+                    for f in os.listdir(storage_dir)
+                    if f.startswith(base_name)
+                ),
+                None,
+            )
             if target_dir is None:
-                logger.error(f"No file starting with '{base_name}' found in {storage_dir}")
+                logger.error(
+                    f"No file starting with '{base_name}' found in {storage_dir}"
+                )
                 raise FileNotFoundError()
             sheets.extend(_parse_travailEmploi(target_dir, structured=structured))
         else:
