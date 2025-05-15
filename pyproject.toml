@@ -19,6 +19,7 @@ dependencies = [
     "wget==3.2",
     "polars==1.29.0",
     "fastembed==0.6.1",
+    "pyalbert==0.8.0"
 ]
 
 [project.urls]

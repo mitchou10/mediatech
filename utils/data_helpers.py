@@ -1,10 +1,13 @@
 import os
 import shutil
-import logging
-from datetime import datetime
+import re
+import json
 import polars as pl
 import psycopg2
+from datetime import datetime
+from .sheets_parser import RagSource
 from config import (
+    get_logger,
     POSTGRES_DB,
     POSTGRES_HOST,
     POSTGRES_PORT,
@@ -12,6 +15,8 @@ from config import (
     POSTGRES_PASSWORD,
     parquet_files_folder,
 )
+
+logger = get_logger(__name__)
 
 
 def format_time(time: str) -> str:
@@ -98,11 +103,11 @@ def remove_folder(folder_path: str):
     if os.path.exists(folder_path):
         try:
             shutil.rmtree(folder_path)
-            logging.info(f"Removed folder: {folder_path}")
+            logger.info(f"Removed folder: {folder_path}")
         except Exception as e:
-            logging.error(f"Error removing folder {folder_path}: {e}")
+            logger.error(f"Error removing folder {folder_path}: {e}")
     else:
-        logging.info(f"Folder {folder_path} does not exist")
+        logger.info(f"Folder {folder_path} does not exist")
 
 
 def remove_file(file_path: str):
@@ -122,11 +127,11 @@ def remove_file(file_path: str):
     if os.path.exists(file_path):
         try:
             os.remove(file_path)
-            logging.info(f"Removed file: {file_path}")
+            logger.info(f"Removed file: {file_path}")
         except Exception as e:
-            logging.error(f"Error removing file {file_path}: {e}")
+            logger.error(f"Error removing file {file_path}: {e}")
     else:
-        logging.info(f"File {file_path} does not exist")
+        logger.info(f"File {file_path} does not exist")
 
 
 def export_tables_to_parquet(output_folder: str = parquet_files_folder):
@@ -163,20 +168,51 @@ def export_tables_to_parquet(output_folder: str = parquet_files_folder):
 
             output_path = f"{parquet_files_folder}/{table_name}.parquet"
             if rows:
-                logging.info(
+                logger.info(
                     f"Exporting table '{table_name}' to Parquet file: {output_path}"
                 )
                 df = pl.DataFrame(rows, schema=columns, orient="row")
                 df.write_parquet(output_path)
-                logging.info(
+                logger.info(
                     f"Sucessfully exported table '{table_name}' to Parquet file: {output_path}"
                 )
             else:
-                logging.warning(
+                logger.warning(
                     f"No data found in table '{table_name}'. No Parquet file created."
                 )
     except Exception as e:
-        logging.error(f"Error exporting table '{table_name}' to Parquet: {e}")
+        logger.error(f"Error exporting table '{table_name}' to Parquet: {e}")
     finally:
         if "conn" in locals():
             conn.close()
+
+
+### Imported functions from the pyalbert library
+
+
+def _add_space_after_punctuation(text: str):
+    return re.sub(r"([.,;:!?])([^\s\d])", r"\1 \2", text)
+
+
+def load_experiences(storage_dir: str):
+    with open(os.path.join(storage_dir, "export-expa-c-riences.json")) as f:
+        documents = json.load(f)
+
+    for d in documents:
+        descr = d["description"]
+        d["description"] = _add_space_after_punctuation(descr)
+
+    return documents
+
+
+def load_sheets(storage_dir: str, sources: str | list[str]):
+    documents = RagSource.get_sheets(
+        storage_dir=storage_dir,
+        sources=sources,
+        structured=False,
+    )
+    documents = [d for d in documents if d["text"][0]]
+    for doc in documents:
+        doc["text"] = doc["text"][0]
+
+    return documents

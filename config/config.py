@@ -14,17 +14,33 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "password")
 # Paths for configurations and data history
 config_file_path = "config/data_config.json"
 data_history_path = "config/data_history.json"
-parquet_files_folder="data/parquet"
+
+# Export folders
+parquet_files_folder = "data/parquet"
 
 # Data folders
 CNIL_DATA_FOLDER = os.getenv("CNIL_DATA_FOLDER", "data/unprocessed/cnil")
 CONSTIT_DATA_FOLDER = os.getenv("CONSTIT_DATA_FOLDER", "data/unprocessed/constit")
-DIRECTORIES_FOLDER = os.getenv("DIRECTORIES_FOLDER", "data/unprocessed/directories")
+LOCAL_DIRECTORY_FOLDER = os.getenv(
+    "LOCAL_DIRECTORY_FOLDER", "data/unprocessed/local_directory"
+)
+NATIONAL_DIRECTORY_FOLDER = os.getenv(
+    "NATIONAL_DIRECTORY_FOLDER", "data/unprocessed/national_directory"
+)
 DOLE_DATA_FOLDER = os.getenv("DOLE_DATA_FOLDER", "data/unprocessed/dole")
 LEGI_DATA_FOLDER = os.getenv("LEGI_DATA_FOLDER", "data/unprocessed/legi")
-
-PARQUET_FOLDER = os.getenv("PARQUET_FOLDER", "data/parquet")
+TRAVAIL_EMPLOI_DATA_FOLDER = os.getenv(
+    "TRAVAIL_EMPLOI_DATA_FOLDER", "data/unprocessed/travail_emploi"
+)
+SERVICE_PUBLIC_PRO_DATA_FOLDER = os.getenv(
+    "SERVICE_PUBLIC_PRO_DATA_FOLDER",
+    "data/unprocessed/service_public_pro",
+)
+SERVICE_PUBLIC_PART_DATA_FOLDER = os.getenv(
+    "SERVICE_PUBLIC_PART_DATA_FOLDER",
+    "data/unprocessed/service_public_part",
+)
 
 # OpenAI API configuration
-STAGGING_URL = os.getenv("STAGGING_URL", "https://albert.api.staging.etalab.gouv.fr/v1")
-STAGGING_API_KEY = os.getenv("STAGGING_API_KEY", "your_api_key_here")
+API_URL = os.getenv("API_URL", "https://albert.api.staging.etalab.gouv.fr/v1")
+API_KEY = os.getenv("API_KEY", "your_api_key_here")

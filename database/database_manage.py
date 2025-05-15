@@ -1,11 +1,11 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from qdrant_client import QdrantClient, models
-import logging
 import json
 from fastembed import SparseTextEmbedding
 from tqdm import tqdm
 from config import (
+    get_logger,
     POSTGRES_DB,
     POSTGRES_HOST,
     POSTGRES_PORT,
@@ -15,11 +15,12 @@ from config import (
 )
 from utils import generate_embeddings
 
-logging.basicConfig(
-    filename="logs/data.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+# logger.basicConfig(
+#     filename="logs/data.log",
+#     level=logger.INFO,
+#     format="%(asctime)s - %(levelname)s - %(message)s",
+# )
+logger = get_logger(__name__)
 
 
 def create_tables(delete_existing: bool = False):
@@ -51,8 +52,10 @@ def create_tables(delete_existing: bool = False):
             password=POSTGRES_PASSWORD,
         )
         cursor = conn.cursor()
-        logging.info("Connected to PostgreSQL database")
-        probe_vector = generate_embeddings(text="Hey, I'am a probe")
+        logger.info("Connected to PostgreSQL database")
+        probe_vector = generate_embeddings(
+            data="Hey, I'am a probe", model="BAAI/bge-m3"
+        )
         embedding_size = len(probe_vector)
 
         # Vérification de l'extension pgvector
@@ -60,16 +63,16 @@ def create_tables(delete_existing: bool = False):
             cursor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
             conn.commit()
 
-            # Vérifier si l'extension a été correctement installée
+            # Checks if the extension is enabled
             cursor.execute("SELECT * FROM pg_extension WHERE extname = 'vector';")
             if cursor.fetchone() is None:
-                logging.error(
+                logger.error(
                     "pgvector extension could not be enabled. Please check if it's installed in your PostgreSQL instance."
                 )
                 return
-            logging.info("pgvector extension enabled successfully")
+            logger.info("pgvector extension enabled successfully")
         except Exception as e:
-            logging.error(f"Error enabling pgvector extension: {e}")
+            logger.error(f"Error enabling pgvector extension: {e}")
             return
 
         with open(config_file_path, "r") as file:
@@ -78,9 +81,15 @@ def create_tables(delete_existing: bool = False):
         # Listing all the tables in the config file
         table_names = []
         for category, data in config.items():
-            if category.lower() == "dila":
-                for table in data.keys():
-                    table_names.append(table)
+            if category.lower().startswith(
+                "service_public"
+            ):  # Gathering service public pro and part sheets in one table
+                if "SERVICE_PUBLIC" not in table_names:
+                    table_names.append("SERVICE_PUBLIC")
+                else:
+                    pass
+            elif category.lower() == "travail_emploi":
+                table_names.append("TRAVAIL_EMPLOI")
             else:
                 table_names.append(category)
 
@@ -90,7 +99,7 @@ def create_tables(delete_existing: bool = False):
                 cursor.execute(f"DROP TABLE IF EXISTS {table_name.upper()} CASCADE;")
 
                 conn.commit()
-                logging.info(
+                logger.info(
                     f"Table '{table_name.upper()}' dropped successfully in database {POSTGRES_DB}"
                 )
 
@@ -105,15 +114,15 @@ def create_tables(delete_existing: bool = False):
             table_exists = cursor.fetchone()[0]
 
             if table_exists:
-                logging.info(
+                logger.info(
                     f"Table '{table_name.upper()}' already exists in database {POSTGRES_DB}"
                 )
             else:
-                # Créer la table si elle n'existe pas
+                # Create table if doesn't exist
 
-                if table_name.lower() == "directories":
+                if table_name.lower().endswith("directory"):
                     cursor.execute(f"""
-                        CREATE TABLE DIRECTORIES (
+                        CREATE TABLE {table_name.upper()} (
                             chunk_id TEXT PRIMARY KEY,
                             types TEXT,
                             nom TEXT,
@@ -140,6 +149,46 @@ def create_tables(delete_existing: bool = False):
                         )
                     """)
 
+                elif table_name.lower() == "travail_emploi":
+                    cursor.execute(f"""
+                        CREATE TABLE TRAVAIL_EMPLOI (
+                            chunk_id TEXT PRIMARY KEY,
+                            sid TEXT NOT NULL,
+                            chunk_index INTEGER NOT NULL,
+                            title TEXT,
+                            surtitre TEXT,
+                            source TEXT,
+                            introduction TEXT,
+                            date TEXT,
+                            url TEXT,
+                            context TEXT,
+                            chunk_text TEXT,
+                            embeddings vector({embedding_size}),
+                            UNIQUE(chunk_id)
+                        )
+                    """)
+                elif table_name.lower() == "service_public":
+                    cursor.execute(f"""
+                        CREATE TABLE SERVICE_PUBLIC (
+                            chunk_id TEXT PRIMARY KEY,
+                            sid TEXT NOT NULL,
+                            chunk_index INTEGER NOT NULL,
+                            audience TEXT,
+                            theme TEXT,
+                            title TEXT,
+                            surtitre TEXT,
+                            source TEXT,
+                            introduction TEXT,
+                            url TEXT,
+                            related_questions TEXT,
+                            web_services TEXT,
+                            context TEXT,
+                            chunk_text TEXT,
+                            embeddings vector({embedding_size}),
+                            UNIQUE(chunk_id)
+                        )
+                    """)
+
                 elif table_name.lower() == "cnil":
                     cursor.execute(f"""
                         CREATE TABLE CNIL (
@@ -155,7 +204,7 @@ def create_tables(delete_existing: bool = False):
                             date TEXT,
                             chunk_text TEXT,
                             embeddings vector({embedding_size}),
-                            UNIQUE(cid, chunk_number)
+                            UNIQUE(chunk_id)
                         )
                     """)
 
@@ -172,7 +221,7 @@ def create_tables(delete_existing: bool = False):
                             date_decision TEXT,
                             chunk_text TEXT,
                             embeddings vector({embedding_size}),
-                            UNIQUE(cid, chunk_number)
+                            UNIQUE(chunk_id)
                         )
                     """)
 
@@ -189,7 +238,7 @@ def create_tables(delete_existing: bool = False):
                             date TEXT,
                             chunk_text TEXT,
                             embeddings vector({embedding_size}),
-                            UNIQUE(cid, chunk_number)
+                            UNIQUE(chunk_id)
                         )
                     """)
 
@@ -210,7 +259,7 @@ def create_tables(delete_existing: bool = False):
                             nota TEXT,
                             chunk_text TEXT,
                             embeddings vector({embedding_size}),
-                            UNIQUE(cid, chunk_number)
+                            UNIQUE(chunk_id)
                         )
                     """)
 
@@ -221,17 +270,18 @@ def create_tables(delete_existing: bool = False):
                         WITH (m = 16, ef_construction = 128);
                     """)
                 except Exception as e:
-                    logging.error(
+                    logger.error(
                         f"Error creating HNSW index on {table_name.upper()} table: {e}"
                     )
+                    raise
 
                 conn.commit()
-                logging.info(
+                logger.info(
                     f"Table '{table_name.upper()}' created successfully in database {POSTGRES_DB}"
                 )
 
     except Exception as e:
-        logging.error(f"Error creating tables in PostgreSQL: {e}")
+        logger.error(f"Error creating tables in PostgreSQL: {e}")
     finally:
         if conn:
             conn.close()
@@ -269,14 +319,19 @@ def insert_data(data: list, table_name: str):
 
         source_cid = data[0][1]
 
-        if table_name.lower() != "directories":  # Only for data having a cid
+        if table_name.upper() in [
+            "LEGI",
+            "CNIL",
+            "CONSTIT",
+            "DOLE",
+        ]:  # Only for data having a cid
             # Delete the existing data for the same cid in order to avoid duplicates and outdated data
             delete_query = f"DELETE FROM {table_name.upper()} WHERE cid = %s"
             cursor.execute(delete_query, (source_cid,))
 
-        if table_name.lower() == "directories":
-            insert_query = """
-                INSERT INTO DIRECTORIES (chunk_id, types, nom, mission, adresses, telephones, email, urls, reseaux_sociaux, applications_mobile, horaires_ouverture, formulaires_contact, information_complementaire, date_modification, siret, siren, responsables, organigramme, hierarchie, url_annuaire, chunk_text, embeddings)
+        if table_name.lower().endswith("directory"):
+            insert_query = f"""
+                INSERT INTO {table_name.upper()} (chunk_id, types, nom, mission, adresses, telephones, email, urls, reseaux_sociaux, applications_mobile, horaires_ouverture, formulaires_contact, information_complementaire, date_modification, siret, siren, responsables, organigramme, hierarchie, url_annuaire, chunk_text, embeddings)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chunk_id) DO UPDATE SET
                 types = EXCLUDED.types,
@@ -302,6 +357,43 @@ def insert_data(data: list, table_name: str):
                 embeddings = EXCLUDED.embeddings;
                 """
 
+        elif table_name.lower() == "travail_emploi":
+            insert_query = """
+                INSERT INTO TRAVAIL_EMPLOI (chunk_id, sid, chunk_index, title, surtitre, source, introduction, date, url, context, chunk_text, embeddings)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (chunk_id) DO UPDATE SET
+                sid = EXCLUDED.sid,
+                chunk_index = EXCLUDED.chunk_index,
+                title = EXCLUDED.title,
+                surtitre = EXCLUDED.surtitre,
+                source = EXCLUDED.source,
+                introduction = EXCLUDED.introduction,
+                date = EXCLUDED.date,
+                url = EXCLUDED.url,
+                context = EXCLUDED.context,
+                chunk_text = EXCLUDED.chunk_text,
+                embeddings = EXCLUDED.embeddings;
+            """
+        elif table_name.lower() == "service_public":
+            insert_query = """
+                INSERT INTO SERVICE_PUBLIC (chunk_id, sid, chunk_index, audience, theme, title, surtitre, source, introduction, url, related_questions, web_services, context, chunk_text, embeddings)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (chunk_id) DO UPDATE SET
+                sid = EXCLUDED.sid,
+                chunk_index = EXCLUDED.chunk_index,
+                audience = EXCLUDED.audience,
+                theme = EXCLUDED.theme,
+                title = EXCLUDED.title,
+                surtitre = EXCLUDED.surtitre,
+                source = EXCLUDED.source,
+                introduction = EXCLUDED.introduction,
+                url = EXCLUDED.url,
+                related_questions = EXCLUDED.related_questions,
+                web_services = EXCLUDED.web_services,
+                context = EXCLUDED.context,
+                chunk_text = EXCLUDED.chunk_text,
+                embeddings = EXCLUDED.embeddings;
+            """
         elif table_name.lower() == "cnil":
             insert_query = """
                 INSERT INTO CNIL (chunk_id, cid, chunk_number, nature, etat, nature_delib, titre, titre_complet, numero, date, chunk_text, embeddings)
@@ -356,16 +448,16 @@ def insert_data(data: list, table_name: str):
             """
 
         else:
-            logging.error(f"Unknown table name: {table_name}")
+            logger.error(f"Unknown table name: {table_name}")
             conn.commit()
             conn.close()
             return
         cursor.executemany(insert_query, data)
         conn.commit()
         conn.close()
-        # logging.info(f"Data inserted into PostgreSQL database")
+        # logger.info(f"Data inserted into PostgreSQL database")
     except Exception as e:
-        logging.error(f"Error inserting data into PostgreSQL: {e}\n{data}")
+        logger.error(f"Error inserting data into PostgreSQL: {e}\n{data}")
 
 
 def postgres_to_qdrant(
@@ -396,7 +488,7 @@ def postgres_to_qdrant(
         sparse vector embeddings to support hybrid search.
     """
 
-    probe_vector = generate_embeddings(text="Hey, I'am a probe", model="BAAI/bge-m3")
+    probe_vector = generate_embeddings(data="Hey, I'am a probe", model="BAAI/bge-m3")
     embedding_size = len(probe_vector)
     bm25_embedding_model = SparseTextEmbedding("Qdrant/bm25")  # For hybrid search
 
@@ -404,9 +496,9 @@ def postgres_to_qdrant(
         # Drop the collection if it exists
         try:
             qdrant_client.delete_collection(collection_name=collection_name)
-            logging.info(f"Collection '{collection_name}' deleted successfully")
+            logger.info(f"Collection '{collection_name}' deleted successfully")
         except Exception as e:
-            logging.error(f"Error deleting collection '{collection_name}': {e}")
+            logger.error(f"Error deleting collection '{collection_name}': {e}")
 
     # Create the Qdrant collection if it doesn't exist
     qdrant_client.recreate_collection(
@@ -467,4 +559,4 @@ def postgres_to_qdrant(
         conn.commit()
         conn.close()
     except Exception as e:
-        logging.error(f"Error inserting data into Qdrant: {e}")
+        logger.error(f"Error inserting data into Qdrant: {e}")

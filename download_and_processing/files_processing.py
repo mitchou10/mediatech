@@ -1,19 +1,26 @@
 import os
 import xml.etree.ElementTree as ET
-import logging
 import json
 import time
 from database import insert_data
 from config import (
-    DIRECTORIES_FOLDER,
-    LEGI_DATA_FOLDER,
+    get_logger,
     CNIL_DATA_FOLDER,
+    LEGI_DATA_FOLDER,
     CONSTIT_DATA_FOLDER,
+    LOCAL_DIRECTORY_FOLDER,
+    NATIONAL_DIRECTORY_FOLDER,
+    TRAVAIL_EMPLOI_DATA_FOLDER,
+    SERVICE_PUBLIC_PRO_DATA_FOLDER,
+    SERVICE_PUBLIC_PART_DATA_FOLDER,
+    DOLE_DATA_FOLDER,
 )
 from utils import (
+    CorpusHandler,
     generate_embeddings,
     make_chunks,
     make_chunks_directories,
+    make_chunks_sheets,
     remove_folder,
     remove_file,
     make_schedule,
@@ -21,14 +28,16 @@ from utils import (
 from datetime import datetime
 from openai import PermissionDeniedError
 
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("openai").setLevel(logging.WARNING)
+# logger.getLogger("httpx").setLevel(logger.WARNING)
+# logger.getLogger("openai").setLevel(logger.WARNING)
 
-logging.basicConfig(
-    filename="logs/data.log",
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+# logger.basicConfig(
+#     filename="logs/data.log",
+#     level=logger.INFO,
+#     format="%(asctime)s - %(levelname)s - %(message)s",
+# )
+
+logger = get_logger(__name__)
 
 
 def process_directories(target_dir: str, config_file_path: str):
@@ -63,15 +72,15 @@ def process_directories(target_dir: str, config_file_path: str):
         config = json.load(file)
         file.close()
     except FileNotFoundError:
-        logging.error(f"Configuration file not found: {config_file_path}")
+        logger.error(f"Configuration file not found: {config_file_path}")
         raise
     except json.JSONDecodeError:
-        logging.error(
+        logger.error(
             f"Error decoding JSON from the configuration file: {config_file_path}"
         )
         raise
     except Exception as e:
-        logging.error(f"Unexpected error while loading configuration file: {e}")
+        logger.error(f"Unexpected error while loading configuration file: {e}")
         raise
 
     ### Loading directories
@@ -85,19 +94,19 @@ def process_directories(target_dir: str, config_file_path: str):
                 else:
                     directory.extend(json_data["service"])
         except FileNotFoundError:
-            logging.error(f"File not found: {target_dir}/{file_name}.json.")
+            logger.error(f"File not found: {target_dir}/{file_name}.json.")
             raise
         except json.JSONDecodeError:
-            logging.error(
+            logger.error(
                 f"Error decoding JSON from the file: {target_dir}/{file_name}.json."
             )
             raise
         except Exception as e:
-            logging.error(
+            logger.error(
                 f"Unexpected error while loading file {target_dir}/{file_name}.json: {e}"
             )
             raise
-    logging.info(f"Loaded {len(directory)} directories from {target_dir}")
+    logger.info(f"Loaded {len(directory)} directories from {target_dir}")
 
     ## Processing data
     for k, data in enumerate(directory):
@@ -148,7 +157,7 @@ def process_directories(target_dir: str, config_file_path: str):
                 date_modification = ""
         except ValueError:
             date_modification = ""
-            logging.debug(f"Date format error for value: {date_str}")
+            logger.debug(f"Date format error for value: {date_str}")
 
         # Types
         types = ""
@@ -272,20 +281,20 @@ def process_directories(target_dir: str, config_file_path: str):
 
         for attempt in range(5):  # Retry embedding up to 5 times
             try:
-                embeddings = generate_embeddings(text=chunk_text)
+                embeddings = generate_embeddings(data=chunk_text)
                 break
             except PermissionDeniedError as e:
-                logging.error(
+                logger.error(
                     f"PermissionDeniedError (API key issue). Unable to generate embeddings : {e}"
                 )
                 raise
             except Exception as e:
                 if attempt == 4:
-                    logging.error(
+                    logger.error(
                         f"Error generating embeddings for text: {chunk_text}. Error: {e}. Maximum retries reached."
                     )
                     raise
-                logging.error(
+                logger.error(
                     f"Error generating embeddings for text: {chunk_text}. Error: {e}. Retrying in 3 seconds (attempt {attempt + 1}/5)"
                 )
                 time.sleep(3)  # Waiting 3 seconds before retrying
@@ -322,7 +331,7 @@ def process_directories(target_dir: str, config_file_path: str):
         )
 
 
-def process_xml_files(target_dir: str):
+def process_dila_xml_files(target_dir: str):
     """
     Processes XML files in the specified target directory and extracts relevant data
     to insert into corresponding database tables.
@@ -391,16 +400,16 @@ def process_xml_files(target_dir: str):
                             # Post-process the text to improve readability
                             lines = content.splitlines()  # Split the text into lines
                             cleaned_lines = [
-                                line.strip() for line in lines if line.strip()
+                                line for line in lines if line
                             ]  # Remove empty lines and extra spaces
                             content = "\n".join(
                                 cleaned_lines
                             )  # Rejoin the cleaned lines with a newline
-                            texte.append(content.strip())
+                            texte.append(content)
                         texte = "\n".join(texte)
 
                         chunks = make_chunks(
-                            text=texte, chunk_size=8000, chunk_overlap=800
+                            text=texte, chunk_size=1500, chunk_overlap=200
                         )
                         data_to_insert = []
 
@@ -413,27 +422,27 @@ def process_xml_files(target_dir: str):
                                         )
                                         break
                                     except PermissionDeniedError as e:
-                                        logging.error(
+                                        logger.error(
                                             f"PermissionDeniedError (API key issue) for chunk {k} of file {file_path}: {e}"
                                         )
                                         raise
                                     except Exception as e:
                                         if attempt == 4:
-                                            logging.error(
+                                            logger.error(
                                                 f"Error generating embeddings for chunk {k} of file {file_path}: {e}. Maximum retries reached."
                                             )
                                             raise
-                                        logging.error(
+                                        logger.error(
                                             f"Error generating embeddings for chunk {k} of file {file_path}: {e}. Retrying in 3 seconds (attempt {attempt + 1}/5)"
                                         )
                                         time.sleep(3)
 
-                                chunk_id = f"{cid}_{k + 1}"  # Unique ID for each chunk, starting from 1
+                                chunk_id = f"{cid}_{k}"  # Unique ID for each chunk, starting from 0
 
                                 new_data = (
                                     chunk_id,  # Primary key
                                     cid,  # Original document ID
-                                    k + 1,  # Chunk number
+                                    k,  # Chunk number
                                     nature,
                                     etat,
                                     titre,
@@ -448,7 +457,7 @@ def process_xml_files(target_dir: str):
                                 )
                                 data_to_insert.append(new_data)
                             except PermissionDeniedError as e:
-                                logging.error(
+                                logger.error(
                                     f"PermissionDeniedError (API key issue) for chunk {k} of file {file_path}: {e}"
                                 )
                                 raise
@@ -458,7 +467,7 @@ def process_xml_files(target_dir: str):
                             insert_data(data=data_to_insert, table_name=table_name)
 
                 except Exception as e:
-                    logging.error(f"Error processing file {file_path}: {e}")
+                    logger.error(f"Error processing file {file_path}: {e}")
                 else:
                     remove_file(file_path=file_path)  # Remove the file after processing
 
@@ -494,16 +503,16 @@ def process_xml_files(target_dir: str):
                             # Post-process the text to improve readability
                             lines = content.splitlines()  # Split the content into lines
                             cleaned_lines = [
-                                line.strip() for line in lines if line.strip()
+                                line for line in lines if line
                             ]  # Remove empty lines and extra spaces
                             content = "\n".join(
                                 cleaned_lines
                             )  # Rejoin the cleaned lines with a newline
-                            texte.append(content.strip())
+                            texte.append(content)
                         texte = "\n".join(texte)
 
                         chunks = make_chunks(
-                            text=texte, chunk_size=8000, chunk_overlap=800
+                            text=texte, chunk_size=1500, chunk_overlap=200
                         )
                         data_to_insert = []
 
@@ -516,27 +525,27 @@ def process_xml_files(target_dir: str):
                                         )
                                         break
                                     except PermissionDeniedError as e:
-                                        logging.error(
+                                        logger.error(
                                             f"PermissionDeniedError (API key issue) for chunk {k} of file {file_path}: {e}"
                                         )
                                         raise
                                     except Exception as e:
                                         if attempt == 4:
-                                            logging.error(
+                                            logger.error(
                                                 f"Error generating embeddings for chunk {k} of file {file_path}: {e}. Maximum retries reached."
                                             )
                                             raise
-                                        logging.error(
+                                        logger.error(
                                             f"Error generating embeddings for chunk {k} of file {file_path}: {e}. Retrying in 3 seconds (attempt {attempt + 1}/5)"
                                         )
                                         time.sleep(3)
 
-                                chunk_id = f"{cid}_{k + 1}"  # Unique ID for each chunk, starting from 1
+                                chunk_id = f"{cid}_{k}"  # Unique ID for each chunk, starting from 0
 
                                 new_data = (
                                     chunk_id,  # Primary key
                                     cid,  # Original document ID
-                                    k + 1,  # Chunk number
+                                    k,  # Chunk number
                                     nature,
                                     etat,
                                     nature_delib,
@@ -549,7 +558,7 @@ def process_xml_files(target_dir: str):
                                 )
                                 data_to_insert.append(new_data)
                             except PermissionDeniedError as e:
-                                logging.error(
+                                logger.error(
                                     f"PermissionDeniedError (API key issue) for chunk {k} of file {file_path}: {e}"
                                 )
                                 raise
@@ -559,7 +568,7 @@ def process_xml_files(target_dir: str):
                             insert_data(data=data_to_insert, table_name=table_name)
 
                 except Exception as e:
-                    logging.error(f"Error processing file {file_path}: {e}")
+                    logger.error(f"Error processing file {file_path}: {e}")
                 else:
                     remove_file(file_path=file_path)  # Remove the file after processing
 
@@ -590,45 +599,45 @@ def process_xml_files(target_dir: str):
                         # Post-process the content to improve readability
                         lines = content.splitlines()  # Split the content into lines
                         cleaned_lines = [
-                            line.strip() for line in lines if line.strip()
+                            line for line in lines if line
                         ]  # Remove empty lines and extra spaces
                         content = "\n".join(
                             cleaned_lines
                         )  # Rejoin the cleaned lines with a newline
-                        texte.append(content.strip())
+                        texte.append(content)
                     texte = "\n".join(texte)
 
-                    chunks = make_chunks(text=texte, chunk_size=8000, chunk_overlap=800)
+                    chunks = make_chunks(text=texte, chunk_size=1500, chunk_overlap=200)
                     data_to_insert = []
 
                     for k, chunk_text in enumerate(chunks):
                         try:
                             for attempt in range(5):
                                 try:
-                                    embeddings = generate_embeddings(text=chunk_text)
+                                    embeddings = generate_embeddings(data=chunk_text)
                                     break
                                 except PermissionDeniedError as e:
-                                    logging.error(
+                                    logger.error(
                                         f"PermissionDeniedError (API key issue) for chunk {k} of file {file_path}: {e}"
                                     )
                                     raise
                                 except Exception as e:
                                     if attempt == 4:
-                                        logging.error(
+                                        logger.error(
                                             f"Error generating embeddings for chunk {k} of file {file_path}: {e}. Maximum retries reached."
                                         )
                                         raise
-                                    logging.error(
+                                    logger.error(
                                         f"Error generating embeddings for chunk {k} of file {file_path}: {e}. Retrying in 3 seconds (attempt {attempt + 1}/5)"
                                     )
                                     time.sleep(3)
 
-                            chunk_id = f"{cid}_{k + 1}"  # Unique ID for each chunk, starting from 1
+                            chunk_id = f"{cid}_{k}"  # Unique ID for each chunk, starting from 0
 
                             new_data = (
                                 chunk_id,  # Primary key
                                 cid,  # Original document ID
-                                k + 1,  # Chunk number
+                                k,  # Chunk number
                                 nature,
                                 solution,
                                 titre,
@@ -639,7 +648,7 @@ def process_xml_files(target_dir: str):
                             )
                             data_to_insert.append(new_data)
                         except PermissionDeniedError as e:
-                            logging.error(
+                            logger.error(
                                 f"PermissionDeniedError (API key issue) for chunk {k} of file {file_path}: {e}"
                             )
                             raise
@@ -649,9 +658,108 @@ def process_xml_files(target_dir: str):
                         insert_data(data=data_to_insert, table_name=table_name)
 
                 except Exception as e:
-                    logging.error(f"Error processing file {file_path}: {e}")
+                    logger.error(f"Error processing file {file_path}: {e}")
                 else:
                     remove_file(file_path=file_path)  # Remove the file after processing
+
+
+def process_sheets(target_dir: str, batch_size: int = 10):
+    table_name = ""
+    if target_dir in [
+        SERVICE_PUBLIC_PRO_DATA_FOLDER,
+        SERVICE_PUBLIC_PART_DATA_FOLDER,
+    ]:
+        table_name = "service_public"
+    elif target_dir == TRAVAIL_EMPLOI_DATA_FOLDER:
+        table_name = "travail_emploi"
+    else:
+        logger.error(f"Unknown target directory '{target_dir}' for processing sheets.")
+        return
+
+    with open(os.path.join(target_dir, "sheets_as_chunks.json")) as f:
+        documents = json.load(f)
+
+    corpus_name = target_dir.split("/")[-1]
+    corpus_handler = CorpusHandler.create_handler(corpus_name, documents)
+    if table_name == "travail_emploi":
+        for batch_documents, batch_embeddings in corpus_handler.iter_docs_embeddings(
+            batch_size
+        ):
+            new_data = []
+
+            for document, embeddings in zip(batch_documents, batch_embeddings):
+                chunk_id = document["hash"].encode("utf8").hex()
+                sid = document["sid"]
+                chunk_index = document["chunk_index"]
+                title = document["title"]
+                surtitre = document["surtitre"]
+                source = document["source"]
+                introduction = document["introduction"]
+                date = document["date"]
+                url = document["url"]
+                context = document["context"] if "context" in document else ""
+                chunk_text = document["text"]
+
+                new_data.append(
+                    chunk_id,
+                    sid,
+                    chunk_index,
+                    title,
+                    surtitre,
+                    source,
+                    introduction,
+                    date,
+                    url,
+                    context,
+                    chunk_text,
+                    embeddings,
+                )
+            insert_data(data=new_data, table_name=table_name)
+    elif table_name == "service_public":
+        for batch_documents, batch_embeddings in corpus_handler.iter_docs_embeddings(
+            batch_size
+        ):
+            new_data = []
+
+            for document, embeddings in zip(batch_documents, batch_embeddings):
+                chunk_id = document["hash"].encode("utf8").hex()
+                sid = document["sid"]
+                chunk_index = document["chunk_index"]
+                audience = document["audience"]
+                theme = document["theme"]
+                title = document["title"]
+                surtitre = document["surtitre"]
+                source = document["source"]
+                introduction = document["introduction"]
+                url = document["url"]
+                related_questions = document["related_questions"]
+                web_services = document["web_services"]
+                context = document["context"] if "context" in document else ""
+                chunk_text = document["text"]
+
+                new_data.append(
+                    chunk_id,
+                    sid,
+                    chunk_index,
+                    audience,
+                    theme,
+                    title,
+                    surtitre,
+                    source,
+                    introduction,
+                    url,
+                    related_questions,
+                    web_services,
+                    context,
+                    chunk_text,
+                    embeddings,
+                )
+            insert_data(data=new_data, table_name=table_name)
+    else:
+        logger.error(
+            f"Unknown table name '{table_name}' for target directory '{target_dir}'."
+        )
+        return
 
 
 def get_data(base_folder: str):
@@ -667,26 +775,66 @@ def get_data(base_folder: str):
     """
 
     all_dirs = sorted(os.listdir(base_folder))
-
-    if base_folder == DIRECTORIES_FOLDER:
-        logging.info(f"Processing directories files located in : {base_folder}")
+    if (
+        base_folder == NATIONAL_DIRECTORY_FOLDER
+        or base_folder == LOCAL_DIRECTORY_FOLDER
+    ):
+        logger.info(f"Processing directory files located in : {base_folder}")
         process_directories(
             target_dir=base_folder, config_file_path="config/data_config.json"
         )
-        logging.info(
-            logging.info(
+        logger.info(
+            logger.info(
                 f"Folder: {base_folder} successfully processed and data successfully inserted into the postgres database"
             )
         )
 
         remove_folder(folder_path=base_folder)
 
+    elif base_folder == TRAVAIL_EMPLOI_DATA_FOLDER:
+        logger.info(f"Processing directory files located in : {base_folder}")
+
+        make_chunks_sheets(
+            storage_dir=base_folder,
+            structured=True,
+            chunk_size=1500,
+            chunk_overlap=200,
+        )
+
+        process_sheets(target_dir=base_folder)
+
+        logger.info(
+            f"Folder: {base_folder} successfully processed and data successfully inserted into the postgres database"
+        )
+
+        # remove_folder(folder_path=base_folder)
+
+    elif (
+        base_folder == SERVICE_PUBLIC_PRO_DATA_FOLDER
+        or base_folder == SERVICE_PUBLIC_PART_DATA_FOLDER
+    ):
+        logger.info(f"Processing directory files located in : {base_folder}")
+
+        make_chunks_sheets(
+            storage_dir=base_folder,
+            structured=True,
+            chunk_size=1500,
+            chunk_overlap=200,
+        )
+        process_sheets(target_dir=base_folder)
+
+        logger.info(
+            f"Folder: {base_folder} successfully processed and data successfully inserted into the postgres database"
+        )
+
+        # remove_folder(folder_path=base_folder)
+
     elif base_folder == CNIL_DATA_FOLDER:
         try:
             all_dirs.remove("cnil")
             all_dirs.insert(0, "cnil")  # Placing the 'cnil' folder at the beginning
         except ValueError:
-            logging.info(f"There is no 'cnil' directory in {base_folder}")
+            logger.info(f"There is no 'cnil' directory in {base_folder}")
 
         for (
             root_dir
@@ -696,19 +844,19 @@ def get_data(base_folder: str):
             if root_dir == "cnil":
                 # This is the freemium extracted folder
                 target_dir = os.path.join(base_folder, "cnil/global/CNIL/TEXT")
-                logging.info(f"Processing folder: {target_dir}")
+                logger.info(f"Processing folder: {target_dir}")
                 print(f"Processing folder: {target_dir}")
 
-                process_xml_files(target_dir=target_dir)
-                logging.info(f"Folder: {target_dir} successfully processed")
+                process_dila_xml_files(target_dir=target_dir)
+                logger.info(f"Folder: {target_dir} successfully processed")
 
                 remove_folder(folder_path=folder_to_remove)
             else:  # for each folder except the freemium one
-                logging.info(f"Processing folder: {target_dir}")
+                logger.info(f"Processing folder: {target_dir}")
                 print(f"Processing folder: {target_dir}")
 
-                process_xml_files(target_dir=target_dir)
-                logging.info(
+                process_dila_xml_files(target_dir=target_dir)
+                logger.info(
                     f"Folder: {target_dir} successfully processed and data successfully inserted into the postgres database"
                 )
 
@@ -719,7 +867,7 @@ def get_data(base_folder: str):
             all_dirs.remove("constit")
             all_dirs.insert(0, "constit")  # Placing the 'cnil' folder at the beginning
         except ValueError:
-            logging.info(f"There is no 'constit' directory in {base_folder}")
+            logger.info(f"There is no 'constit' directory in {base_folder}")
 
         for (
             root_dir
@@ -729,20 +877,20 @@ def get_data(base_folder: str):
             if root_dir == "constit":
                 # This is the freemium extracted folder
                 target_dir = os.path.join(base_folder, "constit/global/CONS/TEXT")
-                logging.info(f"Processing folder: {target_dir}")
+                logger.info(f"Processing folder: {target_dir}")
 
-                process_xml_files(target_dir=target_dir)
-                logging.info(
+                process_dila_xml_files(target_dir=target_dir)
+                logger.info(
                     f"Folder: {target_dir} successfully processed and data successfully inserted into the postgres database"
                 )
 
                 remove_folder(folder_path=folder_to_remove)
             else:  # for each folder except the freemium one
-                logging.info(f"Processing folder: {target_dir}")
+                logger.info(f"Processing folder: {target_dir}")
                 print(f"Processing folder: {target_dir}")
 
-                process_xml_files(target_dir=target_dir)
-                logging.info(
+                process_dila_xml_files(target_dir=target_dir)
+                logger.info(
                     f"Folder: {target_dir} successfully processed and data successfully inserted into the postgres database"
                 )
 
@@ -753,7 +901,7 @@ def get_data(base_folder: str):
             all_dirs.remove("legi")
             all_dirs.insert(0, "legi")  # Placing the 'legi' folder at the beginning
         except ValueError:
-            logging.info(f"There is no 'legi' directory in {base_folder}")
+            logger.info(f"There is no 'legi' directory in {base_folder}")
 
         for (
             root_dir
@@ -768,23 +916,42 @@ def get_data(base_folder: str):
                 target_dir = os.path.join(
                     base_folder, "legi/global/code_et_TNC_en_vigueur"
                 )
-                logging.info(f"Processing folder: {target_dir}")
+                logger.info(f"Processing folder: {target_dir}")
                 print(f"Processing folder: {target_dir}")
 
-                process_xml_files(target_dir=target_dir)
-                logging.info(
+                process_dila_xml_files(target_dir=target_dir)
+                logger.info(
                     f"Folder: {target_dir} successfully processed and data successfully inserted into the database"
                 )
 
                 remove_folder(folder_path=folder_to_remove)
 
             else:  # for each folder except the freemium one
-                logging.info(f"Processing folder: {target_dir}")
+                logger.info(f"Processing folder: {target_dir}")
                 print(f"Processing folder: {target_dir}")
 
-                process_xml_files(target_dir=target_dir)
-                logging.info(
+                process_dila_xml_files(target_dir=target_dir)
+                logger.info(
                     f"Folder: {target_dir} successfully processed and data successfully inserted into the database"
                 )
 
                 remove_folder(folder_path=folder_to_remove)
+
+
+def get_all_data(unprocessed_data_folder: str):
+    """
+    Processes all data directories within the specified unprocessed data folder.
+
+    Args:
+        unprocessed_data_folder (str): Path to the folder containing unprocessed data directories.
+
+    Returns:
+        None
+
+    Note:
+        This function iterates over the contents of the given folder, constructs the full path for each subdirectory,
+        and processes the data using the `get_data` function.
+    """
+    for directory in os.listdir(unprocessed_data_folder):
+        base_folder = os.path.join(unprocessed_data_folder, directory)
+        get_data(base_folder=base_folder)

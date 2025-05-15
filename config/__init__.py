@@ -2,7 +2,11 @@ from .config import (
     CNIL_DATA_FOLDER,
     LEGI_DATA_FOLDER,
     CONSTIT_DATA_FOLDER,
-    DIRECTORIES_FOLDER,
+    LOCAL_DIRECTORY_FOLDER,
+    NATIONAL_DIRECTORY_FOLDER,
+    TRAVAIL_EMPLOI_DATA_FOLDER,
+    SERVICE_PUBLIC_PRO_DATA_FOLDER,
+    SERVICE_PUBLIC_PART_DATA_FOLDER,
     DOLE_DATA_FOLDER,
     parquet_files_folder,
     config_file_path,
@@ -12,6 +16,8 @@ from .config import (
     POSTGRES_DB,
     POSTGRES_USER,
     POSTGRES_PASSWORD,
-    STAGGING_URL,
-    STAGGING_API_KEY,
+    API_URL,
+    API_KEY,
 )
+
+from .logging_config import setup_logging, get_logger
