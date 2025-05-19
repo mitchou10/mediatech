@@ -1,6 +1,7 @@
 from .chunking_and_embedding import (
     CorpusHandler,
     generate_embeddings,
+    generate_embeddings_with_retry,
     make_chunks,
     make_chunks_directories,
     make_chunks_sheets,

@@ -26,12 +26,12 @@ logger = get_logger(__name__)
 
 if __name__ == "__main__":
     # Download files
-    download_files(
-        config_file_path=config_file_path,
-        data_history_path=data_history_path,
-    )
+    # download_files(
+    #     config_file_path=config_file_path,
+    #     data_history_path=data_history_path,
+    # )
 
-    # # Create the tables if they do not exist
+    # # # Create the tables if they do not exist
     create_tables(delete_existing=False)
 
     # Process XML files and insert data into the PostgreSQL database
@@ -39,9 +39,10 @@ if __name__ == "__main__":
     # get_data(base_folder=SERVICE_PUBLIC_PRO_DATA_FOLDER)
     # get_data(base_folder=SERVICE_PUBLIC_PART_DATA_FOLDER)
     # get_data(base_folder=TRAVAIL_EMPLOI_DATA_FOLDER)
-    # get_data(base_folder=LEGI_DATA_FOLDER)
-    # get_data(base_folder=CNIL_DATA_FOLDER)
+    # # get_data(base_folder=LEGI_DATA_FOLDER)
+    # # get_data(base_folder=CNIL_DATA_FOLDER)
     # get_data(base_folder=NATIONAL_DIRECTORY_FOLDER)
+    # get_data(base_folder=LOCAL_DIRECTORY_FOLDER)
 
-    # # Convert tables to Parquet files
-    # export_tables_to_parquet(output_folder=parquet_files_folder)
+    # Convert tables to Parquet files
+    export_tables_to_parquet(output_folder=parquet_files_folder)

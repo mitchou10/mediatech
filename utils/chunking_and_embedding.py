@@ -1,17 +1,17 @@
 from openai import OpenAI
-import pandas as pd
 import numpy as np
 import os
 import json
 import hashlib
-from .sheets_parser import _parse_xml, RagSource
+import time
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from typing import Optional
 from collections import defaultdict
-import re
 from abc import ABC, abstractmethod
+from openai import PermissionDeniedError
 from typing import Generator
 from tqdm import tqdm
+from .sheets_parser import RagSource
 from config import (
     get_logger,
     API_URL,
@@ -63,8 +63,8 @@ class CorpusHandler(ABC):
     ) -> Generator[tuple[list], None, None]:
         desc = f"Processing corpus {self._name} with embeddings..."
         for batch in self.iter_docs(batch_size=batch_size, desc=desc):
-            batch_embeddings = generate_embeddings(
-                [self.doc_to_chunk(x) for x in batch]
+            batch_embeddings = generate_embeddings_with_retry(
+                data=[self.doc_to_chunk(x) for x in batch], attempts=5
             )
             if len([x for x in batch_embeddings if x is not None]) == 0:
                 continue
@@ -73,26 +73,6 @@ class CorpusHandler(ABC):
     @abstractmethod
     def doc_to_chunk(self, doc: dict) -> str:
         raise NotImplementedError("Subclasses should implement this!")
-
-
-# class SppExperiencesHandler(CorpusHandler):
-#     def doc_to_chunk(self, doc: dict) -> str | None:
-#         text = doc["reponse_structure_1"]
-#         if not text:
-#             return None
-#         # Clean some text garbage
-#         # --
-#         # Define regular expression pattern to match non-breaking spaces:
-#         # - \xa0 for Latin-1 (as a raw string)
-#         # - \u00a0 for Unicode non-breaking space
-#         # - \r carriage return
-#         # - &nbsp; html non breaking space
-#         text = re.sub(r"[\xa0\u00a0\r]", " ", text)
-#         text = re.sub(r"&nbsp;", " ", text)
-
-#         # Add a space after the first "," if not already followed by a space.
-#         text = re.sub(r"\,(?!\s)", ". ", text, count=1)
-#         return text
 
 
 class SheetChunksHandler(CorpusHandler):
@@ -105,35 +85,9 @@ class SheetChunksHandler(CorpusHandler):
         return text
 
 
-# def embed(data: None | str | list[str]) -> None | list:
-#     if data is None:
-#         return None
-
-#     if isinstance(data, list):
-#         # Keep track of None positions
-#         indices_of_none = [i for i, x in enumerate(data) if x is None]
-#         filtered_data = [x for x in data if x is not None]
-#         if not filtered_data:
-#             return [None] * len(data)
-
-#         # Apply the original function on filtered data
-#         try:
-#             embeddings = LlmClient.create_embeddings(filtered_data)
-#         except Exception as err:
-#             print(filtered_data)
-#             raise err
-
-#         # Reinsert None at their original positions in reverse order
-#         for index in reversed(indices_of_none):
-#             embeddings.insert(index, None)
-
-#         return embeddings
-
-#     # Fall back to single data input
-#     return LlmClient.create_embeddings(data)
-
-
-def generate_embeddings(data: str | list[str], model: str = "BAAI/bge-m3"):
+def generate_embeddings(
+    data: str | list[str], model: str = "BAAI/bge-m3"
+) -> list[float]:
     """
     Generates embeddings for a given text using a specified model.
 
@@ -157,12 +111,54 @@ def generate_embeddings(data: str | list[str], model: str = "BAAI/bge-m3"):
     embeddings = [item.embedding for item in vector.data]
 
     return embeddings
-    # if isinstance(data, str):
-    #     return embeddings[0]
-    # elif isinstance(data, list) and len(data) == 1:
-    #     return embeddings[0]
-    # else:
-    #     return embeddings
+
+
+def generate_embeddings_with_retry(
+    data: str | list[str], attempts: int = 5, model: str = "BAAI/bge-m3"
+) -> list[float]:
+    """
+    Generate embeddings for the provided data with retry mechanism.
+
+    This function attempts to generate embeddings and retries in case of failures.
+    It will immediately raise PermissionDeniedError if encountered, but retry for
+    other exceptions.
+
+    Args:
+        data (str | list[str]): The text data to generate embeddings for.
+            Can be a single string or a list of strings.
+        attempts (int, optional): Maximum number of retry attempts. Defaults to 5.
+        model (str, optional): The embedding model to use. Defaults to "BAAI/bge-m3".
+            Note: This parameter is passed to the function but not directly used.
+
+    Returns:
+        list[float]: The generated embeddings as a list of floating point numbers.
+
+    Raises:
+        PermissionDeniedError: If there's an API key issue (raised immediately without retrying).
+        Exception: If embedding generation fails after all retry attempts.
+    """
+
+    for attempt in range(attempts):  # Retry embedding up to 5 times
+        try:
+            embeddings = generate_embeddings(data=data, model=model)
+            break
+        except PermissionDeniedError as e:
+            logger.error(
+                f"PermissionDeniedError (API key issue). Unable to generate embeddings : {e}"
+            )
+            raise
+        except Exception as e:
+            if attempt == 4:
+                logger.error(
+                    f"Error generating embeddings for : {data}. Error: {e}. Maximum retries reached ({attempts}). Raising exception."
+                )
+                raise
+            logger.error(
+                f"Error generating embeddings for : {data}. Error: {e}. Retrying in 3 seconds (attempt {attempt + 1}/5)"
+            )
+            time.sleep(3)  # Waiting 3 seconds before retrying
+
+    return embeddings
 
 
 def make_chunks(text: str, chunk_size: int = 1500, chunk_overlap: int = 200):
@@ -220,7 +216,7 @@ def make_chunks_directories(
         nom,
         mission if mission else "",
         types if types else "",
-    ]
+    ]  # adresses not added for now
     text_to_embed = ". ".join([f for f in fields if f]).strip()
 
     return text_to_embed
@@ -330,17 +326,3 @@ def make_chunks_sheets(
     logger.info(f"Info summary:\n {str(json_file_target)}")
 
     logger.info(f"Chunks created in : {str(json_file_target)}")
-
-
-def make_questions(storage_dir: str) -> None:
-    target_dir = storage_dir
-    if storage_dir.split("/")[-1].strip("/") != "data.gouv":
-        target_dir = os.path.join(storage_dir, "data.gouv")
-    questions = _parse_xml(target_dir, "questions")
-    df = pd.DataFrame(questions)
-    df = df.drop_duplicates(subset=["question"])
-    questions = df.to_dict(orient="records")
-    q_fn = os.path.join(storage_dir, "questions.json")
-    with open(q_fn, mode="w", encoding="utf-8") as f:
-        json.dump(questions, f, ensure_ascii=False, indent=4)
-    print("Questions created in", q_fn)

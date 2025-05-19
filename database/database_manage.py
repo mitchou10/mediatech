@@ -55,7 +55,7 @@ def create_tables(delete_existing: bool = False):
         logger.info("Connected to PostgreSQL database")
         probe_vector = generate_embeddings(
             data="Hey, I'am a probe", model="BAAI/bge-m3"
-        )
+        )[0]
         embedding_size = len(probe_vector)
 
         # Vérification de l'extension pgvector
@@ -127,21 +127,21 @@ def create_tables(delete_existing: bool = False):
                             types TEXT,
                             nom TEXT,
                             mission TEXT,
-                            adresses TEXT,
-                            telephones TEXT,
-                            email TEXT,
-                            urls TEXT,
-                            reseaux_sociaux TEXT,
-                            applications_mobile TEXT,
+                            adresses JSONB,
+                            telephones TEXT[],
+                            email TEXT[],
+                            urls TEXT[],
+                            reseaux_sociaux TEXT[],
+                            applications_mobile TEXT[],
                             horaires_ouverture TEXT,
-                            formulaires_contact TEXT,
+                            formulaires_contact TEXT[],
                             information_complementaire TEXT,
                             date_modification TEXT,
                             siret TEXT,
                             siren TEXT,
-                            responsables TEXT,
-                            organigramme TEXT,
-                            hierarchie TEXT,
+                            responsables JSONB,
+                            organigramme TEXT[],
+                            hierarchie JSONB,
                             url_annuaire TEXT,
                             chunk_text TEXT,
                             embeddings vector({embedding_size}),
@@ -161,7 +161,7 @@ def create_tables(delete_existing: bool = False):
                             introduction TEXT,
                             date TEXT,
                             url TEXT,
-                            context TEXT,
+                            context TEXT[],
                             chunk_text TEXT,
                             embeddings vector({embedding_size}),
                             UNIQUE(chunk_id)
@@ -180,9 +180,9 @@ def create_tables(delete_existing: bool = False):
                             source TEXT,
                             introduction TEXT,
                             url TEXT,
-                            related_questions TEXT,
-                            web_services TEXT,
-                            context TEXT,
+                            related_questions JSONB,
+                            web_services JSONB,
+                            context TEXT[],
                             chunk_text TEXT,
                             embeddings vector({embedding_size}),
                             UNIQUE(chunk_id)
@@ -253,7 +253,7 @@ def create_tables(delete_existing: bool = False):
                             titre TEXT,
                             titre_complet TEXT,
                             sous_titres TEXT,
-                            numero TEXT,
+                            numero INTEGER,
                             date_debut TEXT,
                             date_fin TEXT,
                             nota TEXT,

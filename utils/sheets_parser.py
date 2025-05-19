@@ -205,7 +205,7 @@ def _parse_xml_text_structured(
                 for subchild in child.children:
                     if subchild.name != scn:
                         if subchild.string.strip():
-                            print(f"XML warning: {child.name} has orphan text")
+                            logger.debug(f"XML warning: {child.name} has orphan text")
                         continue
 
                     if child.name == "BlocCas":
@@ -419,11 +419,11 @@ def _parse_xml_text(xml_file, structured=False) -> dict:
                 soup.find("ListeSituations").find_all("Situation")
             ):
                 if not situation.find("Titre"):
-                    print("warning: Situation > Titre, not found")
+                    logger.debug("warning: Situation > Titre, not found")
                     continue
 
                 if not situation.find("Texte"):
-                    print("warning: Situation > Texte, not found")
+                    logger.debug("warning: Situation > Texte, not found")
                     continue
 
                 situation_title = normalize(
@@ -485,7 +485,7 @@ def _parse_xml(
         pct = (100 * i) // n
         if pct > current_pct:
             current_pct = pct
-            print(f"Processing sheet: {current_pct}%\r", end="")
+            logger.debug(f"Processing sheet: {current_pct}%\r", end="")
 
         if parse_type == "text":
             doc = _parse_xml_text(xml_file, structured=structured)
