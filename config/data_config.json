@@ -1,30 +1,47 @@
 {
-    "DILA":{
-        "CNIL": {
-            "download_url": "https://echanges.dila.gouv.fr/OPENDATA/CNIL/",
-            "download_folder": "data/cnil"
-        },
-        "CONSTIT": {
-            "download_url": "https://echanges.dila.gouv.fr/OPENDATA/CONSTIT/",
-            "download_folder": "data/constit"
-        },
-        "DOLE": {
-            "download_url": "https://echanges.dila.gouv.fr/OPENDATA/DOLE/",
-            "download_folder": "data/dole"
-        },
-        "LEGI": {
-            "download_url": "https://echanges.dila.gouv.fr/OPENDATA/LEGI/",
-            "download_folder": "data/legi"
-        }
+    "CNIL": {
+        "download_url": "https://echanges.dila.gouv.fr/OPENDATA/CNIL/",
+        "download_folder": "data/unprocessed/cnil",
+        "type": "dila_folder"
     },
-    "directories": {
-        "local_directory": {
-            "download_url": "https://lecomarquage.service-public.fr/donnees_locales_v4/all_latest.tar.bz2",
-            "download_folder": "data/directories"
-        },
-        "national_directory": {
-            "download_url": "https://echanges.dila.gouv.fr/OPENDATA/RefOrgaAdminEtat/FluxAnneeCourante/dila_refOrga_admin_Etat_fr_latest.zip",
-            "download_folder": "data/directories"
-        }
+    "CONSTIT": {
+        "download_url": "https://echanges.dila.gouv.fr/OPENDATA/CONSTIT/",
+        "download_folder": "data/unprocessed/constit",
+        "type": "dila_folder"
+    },
+    "DOLE": {
+        "download_url": "https://echanges.dila.gouv.fr/OPENDATA/DOLE/",
+        "download_folder": "data/unprocessed/dole",
+        "type": "dila_folder"
+    },
+    "LEGI": {
+        "download_url": "https://echanges.dila.gouv.fr/OPENDATA/LEGI/",
+        "download_folder": "data/unprocessed/legi",
+        "type": "dila_folder"
+    },
+    "state_administrations_directory": {
+        "download_url": "https://echanges.dila.gouv.fr/OPENDATA/RefOrgaAdminEtat/FluxAnneeCourante/dila_refOrga_admin_Etat_fr_latest.zip",
+        "download_folder": "data/unprocessed/state_administrations_directory",
+        "type": "directory"
+    },
+    "local_administrations_directory": {
+        "download_url": "https://lecomarquage.service-public.fr/donnees_locales_v4/all_latest.tar.bz2",
+        "download_folder": "data/unprocessed/local_administrations_directory",
+        "type": "directory"
+    },
+    "service_public_part": {
+        "download_url": "https://lecomarquage.service-public.fr/vdd/3.4/part/zip/vosdroits-latest.zip",
+        "download_folder": "data/unprocessed/service_public_part",
+        "type": "sheets"
+    },
+    "service_public_pro": {
+        "download_url": "https://lecomarquage.service-public.fr/vdd/3.4/pro/zip/vosdroits-latest.zip",
+        "download_folder": "data/unprocessed/service_public_pro",
+        "type": "sheets"
+    },
+    "travail_emploi": {
+        "download_url": "https://github.com/SocialGouv/fiches-travail-data/raw/master/data/fiches-travail.json",
+        "download_folder": "data/unprocessed/travail_emploi",
+        "type": "sheets"
     }
 }

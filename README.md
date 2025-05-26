@@ -1,8 +1,9 @@
-# Albert Data Legi
-
+# ALBERT Bibliothèque
+@TO UPDATE
 ## Description
 
-Ce projet traite les données publiques mises à disposition par la DILA (Direction de l'information légale et administrative) pour alimenter la base de connaissance d'ALBERT. Il inclut des scripts pour télécharger, traiter et insérer ces données dans une base PostgreSQL et base de donnée vectorielle (to do).
+Ce projet traite les données publiques mises à disposition par les administrations pour alimenter la base de connaissance d'ALBERT et de faciliter l'accès aux données publiques vectorisées dans la fonction publique. 
+Il inclut des scripts pour télécharger, traiter, embedder, insérer ces données dans une base PostgreSQL et faciliter leur exportation via divers moyens.
 
 ## Instructions
 
@@ -55,8 +56,10 @@ Ce projet traite les données publiques mises à disposition par la DILA (Direct
 
 ### Structure du projet
 
-- **`download_data/`** : Contient les scripts pour télécharger et extraire les fichiers.
+- **`download_and_processing/`** : Contient les scripts pour télécharger et extraire les fichiers.
 - **`database/`** : Contient les scripts pour gérer la base de données (création de tables, insertion de données).
+- **`utils/`** : Contient des fonctions utilitaires partagées entre les différents modules.
+- **`config/`** : Contient les scripts de configuration du projet.
 - **`logs/`** : Contient les fichiers journaux pour suivre l'exécution des scripts.
 - **`main.py`** : Point d'entrée principal pour exécuter le pipeline complet.
 

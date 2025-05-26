@@ -4,3 +4,4 @@ test/
 .env
 __pycache__/
 config/data_history.json
+test.*
