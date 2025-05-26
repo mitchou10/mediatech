@@ -8,8 +8,8 @@ from config import (
     CNIL_DATA_FOLDER,
     LEGI_DATA_FOLDER,
     CONSTIT_DATA_FOLDER,
-    LOCAL_DIRECTORY_FOLDER,
-    NATIONAL_DIRECTORY_FOLDER,
+    LOCAL_ADMINISTRATIONS_DIRECTORY_FOLDER,
+    STATE_ADMINISTRATIONS_DIRECTORY_FOLDER,
     TRAVAIL_EMPLOI_DATA_FOLDER,
     SERVICE_PUBLIC_PRO_DATA_FOLDER,
     SERVICE_PUBLIC_PART_DATA_FOLDER,
@@ -41,7 +41,9 @@ from tqdm import tqdm
 logger = get_logger(__name__)
 
 
-def process_directories(target_dir: str, config_file_path: str):
+def process_directories(
+    target_dir: str, config_file_path: str, model: str = "BAAI/bge-m3"
+):
     """
     Processes directory data from JSON files specified in a configuration file, extracts and transforms relevant fields,
     generates embeddings for each directory, and inserts the processed data into a database.
@@ -69,10 +71,10 @@ def process_directories(target_dir: str, config_file_path: str):
     """
 
     # Check if the target directory is valid
-    if target_dir == NATIONAL_DIRECTORY_FOLDER:
-        table_name = "national_directory"
-    elif target_dir == LOCAL_DIRECTORY_FOLDER:
-        table_name = "local_directory"
+    if target_dir == STATE_ADMINISTRATIONS_DIRECTORY_FOLDER:
+        table_name = "state_administrations_directory"
+    elif target_dir == LOCAL_ADMINISTRATIONS_DIRECTORY_FOLDER:
+        table_name = "local_administrations_directory"
     else:
         logger.error(
             f"Unknown target directory '{target_dir}' for processing directories."
@@ -104,18 +106,20 @@ def process_directories(target_dir: str, config_file_path: str):
     logger.info(f"Loaded {len(directory)} lines of data from {target_dir}")
 
     ## Processing data
-    for k, data in tqdm(enumerate(directory), total=len(directory), desc=f"Processing {table_name}"):
+    for k, data in tqdm(
+        enumerate(directory), total=len(directory), desc=f"Processing {table_name}"
+    ):
         chunk_id = data.get("id", "")
-        nom = data.get("nom", "")
-        url_annuaire = data.get("url_service_public", "")
+        name = data.get("nom", "")
+        directory_url = data.get("url_service_public", "")
 
-        # Adresses
-        adresses = []
-        # adresses_to_concatenate = []
+        # Addresses
+        addresses = []
+        # addresses_to_concatenate = []
         try:
             for adresse in data.get("adresse", [{}]):
                 # Metadata
-                adresses.append(
+                addresses.append(
                     {
                         "adresse": f"{adresse.get('complement1', '')} {adresse.get('complement2', '')} {adresse.get('numero_voie', '')}".strip(),
                         "code_postal": adresse.get("code_postal", ""),
@@ -130,15 +134,15 @@ def process_directories(target_dir: str, config_file_path: str):
             pass
 
         # Phone numbers
-        telephones = []
+        phone_numbers = []
         try:
             for telephone in data.get("telephone", [{}]):
                 if telephone.get("description", ""):
-                    telephones.append(
+                    phone_numbers.append(
                         f"{telephone.get('valeur', '')}. {telephone.get('description', '')}"
                     )
                 else:
-                    telephones.append(f"{telephone.get('valeur', '')}")
+                    phone_numbers.append(f"{telephone.get('valeur', '')}")
         except Exception:
             pass
 
@@ -146,12 +150,12 @@ def process_directories(target_dir: str, config_file_path: str):
         try:
             date_str = data.get("date_modification", "")
             if date_str:
-                date_modification_dt = datetime.strptime(date_str, "%d/%m/%Y %H:%M:%S")
-                date_modification = date_modification_dt.strftime("%d/%m/%Y")
+                modification_date_dt = datetime.strptime(date_str, "%d/%m/%Y %H:%M:%S")
+                modification_date = modification_date_dt.strftime("%d/%m/%Y")
             else:
-                date_modification = ""
+                modification_date = ""
         except ValueError:
-            date_modification = ""
+            modification_date = ""
             logger.debug(f"Date format error for value: {date_str}")
 
         # Types
@@ -190,120 +194,110 @@ def process_directories(target_dir: str, config_file_path: str):
             pass
 
         # Contact forms
-        formulaires_contact = []
+        contact_forms = []
         try:
             for formulaire in data.get("formulaire_contact", []):
                 if isinstance(formulaire, list):
-                    formulaires_contact.extend(formulaire)
+                    contact_forms.extend(formulaire)
                 else:
-                    formulaires_contact.append(formulaire)
+                    contact_forms.append(formulaire)
         except Exception:
             pass
 
         # Emails
-        email = []
+        mails = []
         try:
             for mail in data.get("adresse_courriel", []):
                 if isinstance(mail, list):
-                    email.extend(mail)
+                    mails.extend(mail)
                 else:
-                    email.append(mail)
+                    mails.append(mail)
         except Exception:
             pass
 
         # Opening hours
-        horaires_ouverture = make_schedule(data.get("plage_ouverture", []))
+        opening_hours = make_schedule(data.get("plage_ouverture", []))
 
         # Mobile applications
-        applications_mobile = []
+        mobile_applications = []
         try:
             for application in data.get("application_mobile", [{}]):
-                applications_mobile.append(
+                mobile_applications.append(
                     f"{application.get('description', '')} ({application.get('custom_dico2', '')}) : {application.get('valeur', '')}"
                 )
         except Exception:
             pass
 
-        # Social networks
-        reseaux_sociaux = []
+        # Social medias
+        social_medias = []
         try:
             for reseau in data.get("reseau_social", [{}]):
                 if reseau.get("description", ""):
-                    reseaux_sociaux.append(
+                    social_medias.append(
                         f"{reseau.get('custom_dico2', '')} ({reseau.get('description', '')}) : {reseau.get('valeur', '')}"
                     )
                 else:
-                    reseaux_sociaux.append(
+                    social_medias.append(
                         f"{reseau.get('custom_dico2', '')} : {reseau.get('valeur', '')}"
                     )
         except Exception:
             pass
 
         # Additional information and mission description
-        information_complementaire = data.get("information_complementaire", "")
-        mission = data.get("mission", "")
+        additional_information = data.get("information_complementaire", "")
+        mission_description = data.get("mission", "")
 
         # People in charge
-        responsables = data.get("affectation_personne", [{}])
-        # responsables = []
-        # try:
-        #     for responsable in data.get("affectation_personne", []):
-        #         resp = f"{responsable.get('fonction', '')} : {responsable.get('civilite', '')} {responsable.get('prenom', '')} {responsable.get('nom', '')}"
-        #         if responsable.get("grade", ""):
-        #             resp += f" ({responsable.get('grade', '')})"
-        #         if responsable.get("telephone", ""):
-        #             resp += f"\nTéléphone : {responsable.get('telephone', '')}"
-        #         if responsable.get("adresse_courriel", []):
-        #             for mail in responsable.get("adresse_courriel", []):
-        #                 resp += f"\nEmail : {mail.get('valeur', '')} ({mail.get('libelle', '')})"
-        #         responsables.append(resp)
-
-        # except Exception:
-        #     pass
+        people_in_charge = data.get("affectation_personne", [{}])
 
         # Organizational chart and hierarchy
-        organigramme = []
+        organizational_chart = []
         try:
             for org in data.get("organigramme", []):
                 if org.get("libelle"):
-                    organigramme.append(
+                    organizational_chart.append(
                         f"{org.get('libelle', '')} : {org.get('valeur', '')}"
                     )
                 else:
-                    organigramme.append(f"{org.get('valeur', '')}")
+                    organizational_chart.append(f"{org.get('valeur', '')}")
         except Exception:
             pass
 
-        hierarchie = data.get("hierarchie", [])
+        hierarchy = data.get("hierarchie", [])
 
         chunk_text = make_chunks_directories(
-            nom=nom, mission=mission, types=types, adresses=adresses
+            nom=name,
+            mission=mission_description,
+            responsables=people_in_charge,
+            adresses=addresses,
         )
 
-        embeddings = generate_embeddings_with_retry(data=chunk_text, attempts=5)[0]
+        embeddings = generate_embeddings_with_retry(
+            data=chunk_text, attempts=5, model=model
+        )[0]
 
         ## Insert data into the database
         new_data = (
             chunk_id,
             types,
-            nom,
-            mission,
-            json.dumps(adresses),  # Converts to string
-            telephones,
-            email,
+            name,
+            mission_description,
+            json.dumps(addresses),  # Converts to string
+            phone_numbers,
+            mails,
             urls,
-            reseaux_sociaux,
-            applications_mobile,
-            horaires_ouverture,
-            formulaires_contact,
-            information_complementaire,
-            date_modification,
+            social_medias,
+            mobile_applications,
+            opening_hours,
+            contact_forms,
+            additional_information,
+            modification_date,
             siret,
             siren,
-            json.dumps(responsables),
-            organigramme,
-            json.dumps(hierarchie),
-            url_annuaire,
+            json.dumps(people_in_charge),
+            organizational_chart,
+            json.dumps(hierarchy),
+            directory_url,
             chunk_text,
             embeddings,
         )
@@ -314,7 +308,7 @@ def process_directories(target_dir: str, config_file_path: str):
         )
 
 
-def process_dila_xml_files(target_dir: str):
+def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
     """
     Processes XML files in the specified target directory and extracts relevant data
     to insert into corresponding database tables.
@@ -398,7 +392,7 @@ def process_dila_xml_files(target_dir: str):
                         for k, chunk_text in enumerate(chunks):
                             try:
                                 embeddings = generate_embeddings_with_retry(
-                                    data=chunk_text, attempts=5
+                                    data=chunk_text, attempts=5, model=model
                                 )[0]
                                 chunk_id = f"{cid}_{k}"  # Unique ID for each chunk, starting from 0
 
@@ -481,7 +475,7 @@ def process_dila_xml_files(target_dir: str):
                         for k, chunk_text in enumerate(chunks):
                             try:
                                 embeddings = generate_embeddings_with_retry(
-                                    data=chunk_text, attempts=5
+                                    data=chunk_text, attempts=5, model=model
                                 )[0]
 
                                 chunk_id = f"{cid}_{k}"  # Unique ID for each chunk, starting from 0
@@ -556,7 +550,7 @@ def process_dila_xml_files(target_dir: str):
                     for k, chunk_text in enumerate(chunks):
                         try:
                             embeddings = generate_embeddings_with_retry(
-                                data=chunk_text, attempts=5
+                                data=chunk_text, attempts=5, model=model
                             )[0]
 
                             chunk_id = f"{cid}_{k}"  # Unique ID for each chunk, starting from 0
@@ -590,7 +584,7 @@ def process_dila_xml_files(target_dir: str):
                     remove_file(file_path=file_path)  # Remove the file after processing
 
 
-def process_sheets(target_dir: str, batch_size: int = 10):
+def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int = 10):
     table_name = ""
     if target_dir in [
         SERVICE_PUBLIC_PRO_DATA_FOLDER,
@@ -610,7 +604,8 @@ def process_sheets(target_dir: str, batch_size: int = 10):
     corpus_handler = CorpusHandler.create_handler(corpus_name, documents)
     if table_name == "travail_emploi":
         for batch_documents, batch_embeddings in corpus_handler.iter_docs_embeddings(
-            batch_size
+            batch_size=batch_size,
+            model=model,
         ):
             data_to_insert = []
 
@@ -625,7 +620,8 @@ def process_sheets(target_dir: str, batch_size: int = 10):
                 date = document["date"]
                 url = document["url"]
                 context = document["context"] if "context" in document else ""
-                chunk_text = document["text"]
+                text = document["text"]
+                chunk_text = document["chunk_text"]
 
                 new_data = (
                     chunk_id,
@@ -638,6 +634,7 @@ def process_sheets(target_dir: str, batch_size: int = 10):
                     date,
                     url,
                     context,
+                    text,
                     chunk_text,
                     embeddings,
                 )
@@ -661,10 +658,11 @@ def process_sheets(target_dir: str, batch_size: int = 10):
                 source = document["source"]
                 introduction = document["introduction"]
                 url = document["url"]
-                related_questions = str(document["related_questions"])
+                related_questions = document["related_questions"]
                 web_services = document["web_services"]
                 context = document["context"] if "context" in document else ""
-                chunk_text = document["text"]
+                text = document["text"]
+                chunk_text = document["chunk_text"]
 
                 new_data = (
                     chunk_id,
@@ -680,6 +678,7 @@ def process_sheets(target_dir: str, batch_size: int = 10):
                     json.dumps(related_questions),
                     json.dumps(web_services),
                     context,
+                    text,
                     chunk_text,
                     embeddings,
                 )
@@ -695,7 +694,7 @@ def process_sheets(target_dir: str, batch_size: int = 10):
         return
 
 
-def get_data(base_folder: str):
+def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
     """
     Processes data files located in the specified base folder according to its type.
     Depending on the value of `base_folder`, this function performs several operations.
@@ -708,10 +707,15 @@ def get_data(base_folder: str):
     """
 
     all_dirs = sorted(os.listdir(base_folder))
-    if base_folder in [NATIONAL_DIRECTORY_FOLDER, LOCAL_DIRECTORY_FOLDER]:
+    if base_folder in [
+        STATE_ADMINISTRATIONS_DIRECTORY_FOLDER,
+        LOCAL_ADMINISTRATIONS_DIRECTORY_FOLDER,
+    ]:
         logger.info(f"Processing directory files located in : {base_folder}")
         process_directories(
-            target_dir=base_folder, config_file_path="config/data_config.json"
+            target_dir=base_folder,
+            config_file_path="config/data_config.json",
+            model=model,
         )
         logger.info(
             logger.info(
@@ -731,7 +735,7 @@ def get_data(base_folder: str):
             chunk_overlap=200,
         )
 
-        process_sheets(target_dir=base_folder)
+        process_sheets(target_dir=base_folder, model=model)
 
         logger.info(
             f"Folder: {base_folder} successfully processed and data successfully inserted into the postgres database"
@@ -751,7 +755,7 @@ def get_data(base_folder: str):
             chunk_size=1500,
             chunk_overlap=200,
         )
-        process_sheets(target_dir=base_folder)
+        process_sheets(target_dir=base_folder, model=model)
 
         logger.info(
             f"Folder: {base_folder} successfully processed and data successfully inserted into the postgres database"
@@ -776,14 +780,14 @@ def get_data(base_folder: str):
                 target_dir = os.path.join(base_folder, "cnil/global/CNIL/TEXT")
                 logger.info(f"Processing folder: {target_dir}")
 
-                process_dila_xml_files(target_dir=target_dir)
+                process_dila_xml_files(target_dir=target_dir, model=model)
                 logger.info(f"Folder: {target_dir} successfully processed")
 
                 remove_folder(folder_path=folder_to_remove)
             else:  # for each folder except the freemium one
                 logger.info(f"Processing folder: {target_dir}")
 
-                process_dila_xml_files(target_dir=target_dir)
+                process_dila_xml_files(target_dir=target_dir, model=model)
                 logger.info(
                     f"Folder: {target_dir} successfully processed and data successfully inserted into the postgres database"
                 )
@@ -807,7 +811,7 @@ def get_data(base_folder: str):
                 target_dir = os.path.join(base_folder, "constit/global/CONS/TEXT")
                 logger.info(f"Processing folder: {target_dir}")
 
-                process_dila_xml_files(target_dir=target_dir)
+                process_dila_xml_files(target_dir=target_dir, model=model)
                 logger.info(
                     f"Folder: {target_dir} successfully processed and data successfully inserted into the postgres database"
                 )
@@ -816,7 +820,7 @@ def get_data(base_folder: str):
             else:  # for each folder except the freemium one
                 logger.info(f"Processing folder: {target_dir}")
 
-                process_dila_xml_files(target_dir=target_dir)
+                process_dila_xml_files(target_dir=target_dir, model=model)
                 logger.info(
                     f"Folder: {target_dir} successfully processed and data successfully inserted into the postgres database"
                 )
@@ -845,7 +849,7 @@ def get_data(base_folder: str):
                 )
                 logger.info(f"Processing folder: {target_dir}")
 
-                process_dila_xml_files(target_dir=target_dir)
+                process_dila_xml_files(target_dir=target_dir, model=model)
                 logger.info(
                     f"Folder: {target_dir} successfully processed and data successfully inserted into the database"
                 )
@@ -855,7 +859,7 @@ def get_data(base_folder: str):
             else:  # for each folder except the freemium one
                 logger.info(f"Processing folder: {target_dir}")
 
-                process_dila_xml_files(target_dir=target_dir)
+                process_dila_xml_files(target_dir=target_dir, model=model)
                 logger.info(
                     f"Folder: {target_dir} successfully processed and data successfully inserted into the database"
                 )
@@ -863,7 +867,7 @@ def get_data(base_folder: str):
                 remove_folder(folder_path=folder_to_remove)
 
 
-def get_all_data(unprocessed_data_folder: str):
+def get_all_data(unprocessed_data_folder: str, model: str = "BAAI/bge-m3"):
     """
     Processes all data directories within the specified unprocessed data folder.
 
@@ -879,4 +883,4 @@ def get_all_data(unprocessed_data_folder: str):
     """
     for directory in os.listdir(unprocessed_data_folder):
         base_folder = os.path.join(unprocessed_data_folder, directory)
-        get_data(base_folder=base_folder)
+        get_data(base_folder=base_folder, model=model)

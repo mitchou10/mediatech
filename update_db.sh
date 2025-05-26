@@ -10,4 +10,7 @@ until pg_isready -h $POSTGRES_HOST -p $POSTGRES_PORT -U $POSTGRES_USER; do
 done
 
 # Run the Python script
-python main.py
+python main.py download_files
+python main.py create_tables --model BAAI/bge-m3
+python main.py process_files --all --model BAAI/bge-m3
+python main.py export_tables

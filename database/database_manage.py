@@ -13,7 +13,7 @@ from config import (
     POSTGRES_PASSWORD,
     config_file_path,
 )
-from utils import generate_embeddings
+from utils import generate_embeddings, format_model_name
 
 # logger.basicConfig(
 #     filename="logs/data.log",
@@ -23,7 +23,7 @@ from utils import generate_embeddings
 logger = get_logger(__name__)
 
 
-def create_tables(delete_existing: bool = False):
+def create_tables(model="BAAI/bge-m3", delete_existing: bool = False):
     """
     Creates the necessary tables in the PostgreSQL database as specified in the data configuration file.
     Optionally deletes existing tables before creation.
@@ -53,10 +53,10 @@ def create_tables(delete_existing: bool = False):
         )
         cursor = conn.cursor()
         logger.info("Connected to PostgreSQL database")
-        probe_vector = generate_embeddings(
-            data="Hey, I'am a probe", model="BAAI/bge-m3"
-        )[0]
+        probe_vector = generate_embeddings(data="Hey, I'am a probe", model=model)[0]
         embedding_size = len(probe_vector)
+
+        model_name = format_model_name(model)
 
         # Vérification de l'extension pgvector
         try:
@@ -125,26 +125,26 @@ def create_tables(delete_existing: bool = False):
                         CREATE TABLE {table_name.upper()} (
                             chunk_id TEXT PRIMARY KEY,
                             types TEXT,
-                            nom TEXT,
-                            mission TEXT,
-                            adresses JSONB,
-                            telephones TEXT[],
-                            email TEXT[],
+                            name TEXT,
+                            mission_description TEXT,
+                            addresses JSONB,
+                            phone_numbers TEXT[],
+                            mails TEXT[],
                             urls TEXT[],
-                            reseaux_sociaux TEXT[],
-                            applications_mobile TEXT[],
-                            horaires_ouverture TEXT,
-                            formulaires_contact TEXT[],
-                            information_complementaire TEXT,
-                            date_modification TEXT,
+                            social_medias TEXT[],
+                            mobile_applications TEXT[],
+                            opening_hours TEXT,
+                            contact_forms TEXT[],
+                            additional_information TEXT,
+                            modification_date TEXT,
                             siret TEXT,
                             siren TEXT,
-                            responsables JSONB,
-                            organigramme TEXT[],
-                            hierarchie JSONB,
-                            url_annuaire TEXT,
+                            people_in_charge JSONB,
+                            organizational_chart TEXT[],
+                            hierarchy JSONB,
+                            directory_url TEXT,
                             chunk_text TEXT,
-                            embeddings vector({embedding_size}),
+                            "embeddings_{model_name}" vector({embedding_size}),
                             UNIQUE(chunk_id)
                         )
                     """)
@@ -162,8 +162,9 @@ def create_tables(delete_existing: bool = False):
                             date TEXT,
                             url TEXT,
                             context TEXT[],
+                            text TEXT,
                             chunk_text TEXT,
-                            embeddings vector({embedding_size}),
+                            "embeddings_{model_name}" vector({embedding_size}),
                             UNIQUE(chunk_id)
                         )
                     """)
@@ -183,8 +184,9 @@ def create_tables(delete_existing: bool = False):
                             related_questions JSONB,
                             web_services JSONB,
                             context TEXT[],
+                            text TEXT,
                             chunk_text TEXT,
-                            embeddings vector({embedding_size}),
+                            "embeddings_{model_name}" vector({embedding_size}),
                             UNIQUE(chunk_id)
                         )
                     """)
@@ -203,7 +205,7 @@ def create_tables(delete_existing: bool = False):
                             numero TEXT,
                             date TEXT,
                             chunk_text TEXT,
-                            embeddings vector({embedding_size}),
+                            "embeddings_{model_name}" vector({embedding_size}),
                             UNIQUE(chunk_id)
                         )
                     """)
@@ -220,7 +222,7 @@ def create_tables(delete_existing: bool = False):
                             numero TEXT,
                             date_decision TEXT,
                             chunk_text TEXT,
-                            embeddings vector({embedding_size}),
+                            "embeddings_{model_name}" vector({embedding_size}),
                             UNIQUE(chunk_id)
                         )
                     """)
@@ -237,7 +239,7 @@ def create_tables(delete_existing: bool = False):
                             numero TEXT,
                             date TEXT,
                             chunk_text TEXT,
-                            embeddings vector({embedding_size}),
+                            "embeddings_{model_name}" vector({embedding_size}),
                             UNIQUE(chunk_id)
                         )
                     """)
@@ -258,7 +260,7 @@ def create_tables(delete_existing: bool = False):
                             date_fin TEXT,
                             nota TEXT,
                             chunk_text TEXT,
-                            embeddings vector({embedding_size}),
+                            "embeddings_{model_name}" vector({embedding_size}),
                             UNIQUE(chunk_id)
                         )
                     """)
@@ -266,7 +268,7 @@ def create_tables(delete_existing: bool = False):
                 # Create index for vector similarity search
                 try:
                     cursor.execute(f"""
-                        CREATE INDEX ON {table_name.upper()} USING hnsw (embeddings vector_cosine_ops)
+                        CREATE INDEX ON {table_name.upper()} USING hnsw ("embeddings_{model_name}" vector_cosine_ops)
                         WITH (m = 16, ef_construction = 128);
                     """)
                 except Exception as e:
@@ -287,7 +289,7 @@ def create_tables(delete_existing: bool = False):
             conn.close()
 
 
-def insert_data(data: list, table_name: str):
+def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
     """
     Inserts a list of data rows into the specified PostgreSQL table, handling upserts and duplicate avoidance.
 
@@ -317,6 +319,7 @@ def insert_data(data: list, table_name: str):
         )
         cursor = conn.cursor()
 
+        model_name = format_model_name(model)
         source_cid = data[0][1]
 
         if table_name.upper() in [
@@ -331,36 +334,36 @@ def insert_data(data: list, table_name: str):
 
         if table_name.lower().endswith("directory"):
             insert_query = f"""
-                INSERT INTO {table_name.upper()} (chunk_id, types, nom, mission, adresses, telephones, email, urls, reseaux_sociaux, applications_mobile, horaires_ouverture, formulaires_contact, information_complementaire, date_modification, siret, siren, responsables, organigramme, hierarchie, url_annuaire, chunk_text, embeddings)
+                INSERT INTO {table_name.upper()} (chunk_id, types, name, mission_description, addresses, phone_numbers, mails, urls, social_medias, mobile_applications, opening_hours, contact_forms, additional_information, modification_date, siret, siren, people_in_charge, organizational_chart, hierarchy, directory_url, chunk_text, "embeddings_{model_name}")
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chunk_id) DO UPDATE SET
                 types = EXCLUDED.types,
-                nom = EXCLUDED.nom,
-                mission = EXCLUDED.mission,
-                adresses = EXCLUDED.adresses,
-                telephones = EXCLUDED.telephones,
-                email = EXCLUDED.email,
+                name = EXCLUDED.name,
+                mission_description = EXCLUDED.mission_description,
+                addresses = EXCLUDED.addresses,
+                phone_numbers = EXCLUDED.phone_numbers,
+                mails = EXCLUDED.mails,
                 urls = EXCLUDED.urls,
-                reseaux_sociaux = EXCLUDED.reseaux_sociaux,
-                applications_mobile = EXCLUDED.applications_mobile,
-                horaires_ouverture = EXCLUDED.horaires_ouverture,
-                formulaires_contact = EXCLUDED.formulaires_contact,
-                information_complementaire = EXCLUDED.information_complementaire,
-                date_modification = EXCLUDED.date_modification,
+                social_medias = EXCLUDED.social_medias,
+                mobile_applications = EXCLUDED.mobile_applications,
+                opening_hours = EXCLUDED.opening_hours,
+                contact_forms = EXCLUDED.contact_forms,
+                additional_information = EXCLUDED.additional_information,
+                modification_date = EXCLUDED.modification_date,
                 siret = EXCLUDED.siret,
                 siren = EXCLUDED.siren,
-                responsables = EXCLUDED.responsables,
-                organigramme = EXCLUDED.organigramme,
-                hierarchie = EXCLUDED.hierarchie,
-                url_annuaire = EXCLUDED.url_annuaire,
+                people_in_charge = EXCLUDED.people_in_charge,
+                organizational_chart = EXCLUDED.organizational_chart,
+                hierarchy = EXCLUDED.hierarchy,
+                directory_url = EXCLUDED.directory_url,
                 chunk_text = EXCLUDED.chunk_text,
-                embeddings = EXCLUDED.embeddings;
+                "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
                 """
 
         elif table_name.lower() == "travail_emploi":
-            insert_query = """
-                INSERT INTO TRAVAIL_EMPLOI (chunk_id, sid, chunk_index, title, surtitre, source, introduction, date, url, context, chunk_text, embeddings)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            insert_query = f"""
+                INSERT INTO TRAVAIL_EMPLOI (chunk_id, sid, chunk_index, title, surtitre, source, introduction, date, url, context, text, chunk_text, "embeddings_{model_name}")
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chunk_id) DO UPDATE SET
                 sid = EXCLUDED.sid,
                 chunk_index = EXCLUDED.chunk_index,
@@ -371,13 +374,14 @@ def insert_data(data: list, table_name: str):
                 date = EXCLUDED.date,
                 url = EXCLUDED.url,
                 context = EXCLUDED.context,
+                text = EXCLUDED.text,
                 chunk_text = EXCLUDED.chunk_text,
-                embeddings = EXCLUDED.embeddings;
+                "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
             """
         elif table_name.lower() == "service_public":
-            insert_query = """
-                INSERT INTO SERVICE_PUBLIC (chunk_id, sid, chunk_index, audience, theme, title, surtitre, source, introduction, url, related_questions, web_services, context, chunk_text, embeddings)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            insert_query = f"""
+                INSERT INTO SERVICE_PUBLIC (chunk_id, sid, chunk_index, audience, theme, title, surtitre, source, introduction, url, related_questions, web_services, context, text, chunk_text, "embeddings_{model_name}")
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chunk_id) DO UPDATE SET
                 sid = EXCLUDED.sid,
                 chunk_index = EXCLUDED.chunk_index,
@@ -391,12 +395,13 @@ def insert_data(data: list, table_name: str):
                 related_questions = EXCLUDED.related_questions,
                 web_services = EXCLUDED.web_services,
                 context = EXCLUDED.context,
+                text = EXCLUDED.text,
                 chunk_text = EXCLUDED.chunk_text,
-                embeddings = EXCLUDED.embeddings;
+                "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
             """
         elif table_name.lower() == "cnil":
-            insert_query = """
-                INSERT INTO CNIL (chunk_id, cid, chunk_number, nature, etat, nature_delib, titre, titre_complet, numero, date, chunk_text, embeddings)
+            insert_query = f"""
+                INSERT INTO CNIL (chunk_id, cid, chunk_number, nature, etat, nature_delib, titre, titre_complet, numero, date, chunk_text, "embeddings_{model_name}")
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chunk_id) DO UPDATE SET
                 cid = EXCLUDED.cid,
@@ -409,11 +414,11 @@ def insert_data(data: list, table_name: str):
                 numero = EXCLUDED.numero,
                 date = EXCLUDED.date,
                 chunk_text = EXCLUDED.chunk_text,
-                embeddings = EXCLUDED.embeddings;
+                "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
             """
         elif table_name.lower() == "constit":
-            insert_query = """
-                INSERT INTO CONSTIT (chunk_id, cid, chunk_number, nature, solution, titre, numero, date_decision, chunk_text, embeddings)
+            insert_query = f"""
+                INSERT INTO CONSTIT (chunk_id, cid, chunk_number, nature, solution, titre, numero, date_decision, chunk_text, "embeddings_{model_name}")
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chunk_id) DO UPDATE SET
                 cid = EXCLUDED.cid,
@@ -424,12 +429,12 @@ def insert_data(data: list, table_name: str):
                 numero = EXCLUDED.numero,
                 date_decision = EXCLUDED.date_decision,
                 chunk_text = EXCLUDED.chunk_text,
-                embeddings = EXCLUDED.embeddings;
+                "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
             """
 
         elif table_name.lower() == "legi":
-            insert_query = """
-                INSERT INTO LEGI (chunk_id, cid, chunk_number, nature, etat, titre, titre_complet, sous_titres, numero, date_debut, date_fin, nota, chunk_text, embeddings)
+            insert_query = f"""
+                INSERT INTO LEGI (chunk_id, cid, chunk_number, nature, etat, titre, titre_complet, sous_titres, numero, date_debut, date_fin, nota, chunk_text, "embeddings_{model_name}")
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chunk_id) DO UPDATE SET
                 cid = EXCLUDED.cid,
@@ -444,7 +449,7 @@ def insert_data(data: list, table_name: str):
                 date_fin = EXCLUDED.date_fin,
                 nota = EXCLUDED.nota,
                 chunk_text = EXCLUDED.chunk_text,
-                embeddings = EXCLUDED.embeddings;
+                "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
             """
 
         else:
@@ -464,6 +469,7 @@ def postgres_to_qdrant(
     table_name: str,
     qdrant_client: QdrantClient,
     collection_name: str,
+    model: str = "BAAI/bge-m3",
     delete_existing: bool = False,
 ):
     """
@@ -488,8 +494,9 @@ def postgres_to_qdrant(
         sparse vector embeddings to support hybrid search.
     """
 
-    probe_vector = generate_embeddings(data="Hey, I'am a probe", model="BAAI/bge-m3")
+    probe_vector = generate_embeddings(data="Hey, I'am a probe", model=model)
     embedding_size = len(probe_vector)
+    model_name = format_model_name(model)
     bm25_embedding_model = SparseTextEmbedding("Qdrant/bm25")  # For hybrid search
 
     if delete_existing:
@@ -504,7 +511,7 @@ def postgres_to_qdrant(
     qdrant_client.recreate_collection(
         collection_name=collection_name,
         vectors_config={
-            "BAAI/bge-m3": models.VectorParams(
+            model: models.VectorParams(
                 size=embedding_size, distance=models.Distance.COSINE
             )
         },
@@ -535,11 +542,10 @@ def postgres_to_qdrant(
                 bm25_embedding_model.passage_embed(row["chunk_text"])
             )
             chunk_id = row["chunk_id"]
-            embeddings = row["embeddings"]
+            embeddings = row[f"embeddings_{model_name}"]
             metadata = dict(row)
             del (
-                metadata["chunk_id"],
-                metadata["embeddings"],
+                metadata[f"embeddings_{model_name}"],
             )  # Remove unnecessary fields from metadata
 
         qdrant_client.upsert(
@@ -548,7 +554,7 @@ def postgres_to_qdrant(
                 models.PointStruct(
                     id=chunk_id,
                     vector={
-                        "BAAI/bge-m3": embeddings,
+                        model: embeddings,
                         "bm25": bm25_embeddings[0].as_object(),
                     },
                     payload=metadata,

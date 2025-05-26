@@ -19,14 +19,14 @@
         "download_folder": "data/unprocessed/legi",
         "type": "dila_folder"
     },
-    "national_directory": {
+    "state_administrations_directory": {
         "download_url": "https://echanges.dila.gouv.fr/OPENDATA/RefOrgaAdminEtat/FluxAnneeCourante/dila_refOrga_admin_Etat_fr_latest.zip",
-        "download_folder": "data/unprocessed/national_directory",
+        "download_folder": "data/unprocessed/state_administrations_directory",
         "type": "directory"
     },
-    "local_directory": {
+    "local_administrations_directory": {
         "download_url": "https://lecomarquage.service-public.fr/donnees_locales_v4/all_latest.tar.bz2",
-        "download_folder": "data/unprocessed/local_directory",
+        "download_folder": "data/unprocessed/local_administrations_directory",
         "type": "directory"
     },
     "service_public_part": {

@@ -12,6 +12,7 @@ from openai import PermissionDeniedError
 from typing import Generator
 from tqdm import tqdm
 from .sheets_parser import RagSource
+from .data_helpers import doc_to_chunk
 from config import (
     get_logger,
     API_URL,
@@ -59,12 +60,15 @@ class CorpusHandler(ABC):
             yield corpus[start_idx:end_idx]
 
     def iter_docs_embeddings(
-        self, batch_size: int
+        self, batch_size: int, model: str = "BAAI/bge-m3"
     ) -> Generator[tuple[list], None, None]:
         desc = f"Processing corpus {self._name} with embeddings..."
         for batch in self.iter_docs(batch_size=batch_size, desc=desc):
+            # batch_embeddings = generate_embeddings_with_retry(
+            #     data=[self.doc_to_chunk(x) for x in batch], attempts=5
+            # )
             batch_embeddings = generate_embeddings_with_retry(
-                data=[self.doc_to_chunk(x) for x in batch], attempts=5
+                data=[x.get("chunk_text") for x in batch], attempts=5, model=model
             )
             if len([x for x in batch_embeddings if x is not None]) == 0:
                 continue
@@ -78,11 +82,21 @@ class CorpusHandler(ABC):
 class SheetChunksHandler(CorpusHandler):
     def doc_to_chunk(self, doc: dict) -> str | None:
         context = ""
-        if "context" in doc:
+        if doc.get("context"):
             context = "  ( > ".join(doc["context"]) + ")"
+        # print(f"Text is : {doc["text"]}")
+        # print(f"Context is : {context}")
+        # print(f"Title is : {doc['title']}")
+        # print(f"Introduction is : {doc['introduction']}")
+        if doc.get("introduction") not in doc["text"]:
+            chunk_text = "\n".join(
+                [doc["title"] + context, doc["introduction"], doc["text"]]
+            )
+        else:
+            chunk_text = "\n".join([doc["title"] + context, doc["text"]])
+        # print(f"Text to embed: {chunk_text}")
 
-        text = "\n".join([doc["title"] + context, doc["introduction"], doc["text"]])
-        return text
+        return chunk_text
 
 
 def generate_embeddings(
@@ -141,7 +155,7 @@ def generate_embeddings_with_retry(
     for attempt in range(attempts):  # Retry embedding up to 5 times
         try:
             embeddings = generate_embeddings(data=data, model=model)
-            break
+            return embeddings
         except PermissionDeniedError as e:
             logger.error(
                 f"PermissionDeniedError (API key issue). Unable to generate embeddings : {e}"
@@ -157,8 +171,6 @@ def generate_embeddings_with_retry(
                 f"Error generating embeddings for : {data}. Error: {e}. Retrying in 3 seconds (attempt {attempt + 1}/5)"
             )
             time.sleep(3)  # Waiting 3 seconds before retrying
-
-    return embeddings
 
 
 def make_chunks(text: str, chunk_size: int = 1500, chunk_overlap: int = 200):
@@ -182,7 +194,10 @@ def make_chunks(text: str, chunk_size: int = 1500, chunk_overlap: int = 200):
 
 
 def make_chunks_directories(
-    nom: str, mission: Optional[str], types: Optional[str], adresses: Optional[list]
+    nom: str,
+    mission: Optional[str],
+    responsables: Optional[list],
+    adresses: Optional[list],
 ) -> str:
     """
     Generates a concatenated string from provided entity information and a list of addresses for embedding purposes.
@@ -191,6 +206,14 @@ def make_chunks_directories(
         nom (str): The name of the entity.
         mission (str): The mission or purpose of the entity.
         types (str): The type(s) or category of the entity.
+        responsables (list): A list of dictionaries, each representing a responsible person with possible keys:
+            - 'fonction' (str, optional): The function or role of the person.
+            - 'civilite' (str, optional): The title or salutation of the person.
+            - 'prenom' (str, optional): The first name of the person.
+            - 'nom' (str, optional): The last name of the person.
+            - 'grade' (str, optional): The grade or rank of the person.
+            - 'telephone' (str, optional): The telephone number of the person.
+            - 'adresse_courriel' (list, optional): A list of email addresses, each represented as a dictionary with keys:
         adresses (list): A list of dictionaries, each representing an address with possible keys:
             - 'complement1' (str, optional): Additional address information.
             - 'complement2' (str, optional): Additional address information.
@@ -203,19 +226,41 @@ def make_chunks_directories(
         str: A single string containing the concatenated and formatted information, suitable for embedding or search optimization.
     """
     adresses_to_concatenate = []
-    for adresse in adresses:
-        adresses_to_concatenate.append(
-            f" {adresse.get('complement1', '')} {adresse.get('complement2', '')} {adresse.get('numero_voie', '')}, {adresse.get('code_postal', '')} {adresse.get('nom_commune', '')} {adresse.get('pays', '')}".strip()
-        )
+    try:
+        for adresse in adresses:
+            adresses_to_concatenate.append(
+                f" {adresse.get('complement1', '')} {adresse.get('complement2', '')} {adresse.get('numero_voie', '')}, {adresse.get('code_postal', '')} {adresse.get('nom_commune', '')} {adresse.get('pays', '')}".strip()
+            )
 
-    # Concatenate all addresses in order to add them to the data to embed
-    adresses_to_concatenate = " ".join(adresses_to_concatenate)
+        # Concatenate all addresses in order to add them to the data to embed
+        adresses_to_concatenate = " ".join(adresses_to_concatenate)
+    except Exception:
+        pass
+
+    responsables_to_concatenate = []
+    try:
+        for responsable in responsables:
+            resp = f"{responsable.get('fonction', '')}"
+            if responsable.get("personne", {}):
+                personne = responsable.get("personne", {})
+                resp += f" : {personne.get('civilite', '')} {personne.get('prenom', '')} {personne.get('nom', '')}"
+                if personne.get("grade", ""):
+                    resp += f" ({personne.get('grade', '')})"
+            #     if personne.get("adresse_courriel", []):
+            #         for mail in personne.get("adresse_courriel", []):
+            #             resp += f"\nEmail : {mail.get('valeur', '')} ({mail.get('libelle', '')})"
+            # if responsable.get("telephone", ""):
+            #     resp += f"\nTéléphone : {responsable.get('telephone', '')}"
+            responsables_to_concatenate.append(resp)
+        responsables_to_concatenate = ".\n".join(responsables_to_concatenate)
+    except Exception:
+        pass
 
     # Text to embed in order to makes the search more efficient
     fields = [
         nom,
         mission if mission else "",
-        types if types else "",
+        responsables_to_concatenate if responsables_to_concatenate else "",
     ]  # adresses not added for now
     text_to_embed = ". ".join([f for f in fields if f]).strip()
 
@@ -223,7 +268,7 @@ def make_chunks_directories(
 
 
 def make_chunks_sheets(
-    storage_dir: str, structured=False, chunk_size=1500, chunk_overlap=200
+    storage_dir: str, structured=True, chunk_size=1500, chunk_overlap=200
 ) -> None:
     """Chunkify sheets and save to a JSON file"""
 
@@ -281,6 +326,10 @@ def make_chunks_sheets(
                     "chunk_index": index,
                     "text": fragment,  # overwrite previous value
                 }
+
+                chunk["chunk_text"] = doc_to_chunk(doc=chunk)
+                # print(f"Chunk text: {chunk['chunk_text']}")
+                # print("*" * 20)
                 if isinstance(natural_chunk, dict) and "context" in natural_chunk:
                     chunk["context"] = natural_chunk["context"]
                     chunk_content = "".join(chunk["context"]) + fragment

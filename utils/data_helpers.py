@@ -123,6 +123,10 @@ def format_time(time: str) -> str:
         return time
 
 
+def format_model_name(model_name: str) -> str:
+    return model_name.partition("/")[2]
+
+
 def make_schedule(plages: list) -> str:
     """
     Generates a formatted schedule string from a list of time slot dictionaries.
@@ -271,7 +275,30 @@ def export_tables_to_parquet(output_folder: str = parquet_files_folder):
             conn.close()
 
 
+def export_parquet_to_huggingface(table_name: str):
+    return
+
+
 ### Imported functions from the pyalbert library
+
+
+def doc_to_chunk(doc: dict) -> str | None:
+    context = ""
+    if doc.get("context"):
+        context = "  ( > ".join(doc["context"]) + ")"
+    # print(f"Text is : {doc["text"]}")
+    # print(f"Context is : {context}")
+    # print(f"Title is : {doc['title']}")
+    # print(f"Introduction is : {doc['introduction']}")
+    if doc.get("introduction") not in doc["text"]:
+        chunk_text = "\n".join(
+            [doc["title"] + context, doc["introduction"], doc["text"]]
+        )
+    else:
+        chunk_text = "\n".join([doc["title"] + context, doc["text"]])
+    # print(f"Text to embed: {chunk_text}")
+
+    return chunk_text
 
 
 def _add_space_after_punctuation(text: str):

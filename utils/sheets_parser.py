@@ -1,15 +1,11 @@
-import hashlib
 import json
 import os
 import string
 import unicodedata
-from collections import defaultdict
 
-import numpy as np
-import pandas as pd
+
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from config import (
     get_logger,

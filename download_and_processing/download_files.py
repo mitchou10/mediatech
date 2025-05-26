@@ -33,10 +33,12 @@ def download_files(config_file_path: str, data_history_path: str):
     Raises:
         Exception: Errors are logged.
     """
-
+    print("im here")
+    print(f"config_file_path: {config_file_path}")
+    print(f"data_history_path: {data_history_path}")
     config = load_config(config_file_path=config_file_path)
     log = load_data_history(data_history_path=data_history_path)
-
+    print("im here2")
     for file_name, attributes in config.items():
         if attributes.get("type") == "dila_folder":
             url = attributes.get("download_url", "")

@@ -21,11 +21,11 @@ parquet_files_folder = "data/parquet"
 # Data folders
 CNIL_DATA_FOLDER = os.getenv("CNIL_DATA_FOLDER", "data/unprocessed/cnil")
 CONSTIT_DATA_FOLDER = os.getenv("CONSTIT_DATA_FOLDER", "data/unprocessed/constit")
-LOCAL_DIRECTORY_FOLDER = os.getenv(
-    "LOCAL_DIRECTORY_FOLDER", "data/unprocessed/local_directory"
+LOCAL_ADMINISTRATIONS_DIRECTORY_FOLDER = os.getenv(
+    "LOCAL_ADMINISTRATIONS_DIRECTORY_FOLDER", "data/unprocessed/local_administrations_directory"
 )
-NATIONAL_DIRECTORY_FOLDER = os.getenv(
-    "NATIONAL_DIRECTORY_FOLDER", "data/unprocessed/national_directory"
+STATE_ADMINISTRATIONS_DIRECTORY_FOLDER = os.getenv(
+    "STATE_ADMINISTRATIONS_DIRECTORY_FOLDER", "data/unprocessed/state_administrations_directory"
 )
 DOLE_DATA_FOLDER = os.getenv("DOLE_DATA_FOLDER", "data/unprocessed/dole")
 LEGI_DATA_FOLDER = os.getenv("LEGI_DATA_FOLDER", "data/unprocessed/legi")
