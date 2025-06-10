@@ -64,12 +64,12 @@ class CorpusHandler(ABC):
     ) -> Generator[tuple[list], None, None]:
         desc = f"Processing corpus {self._name} with embeddings..."
         for batch in self.iter_docs(batch_size=batch_size, desc=desc):
-            # batch_embeddings = generate_embeddings_with_retry(
-            #     data=[self.doc_to_chunk(x) for x in batch], attempts=5
-            # )
             batch_embeddings = generate_embeddings_with_retry(
-                data=[x.get("chunk_text") for x in batch], attempts=5, model=model
+                data=[self.doc_to_chunk(x) for x in batch], attempts=5
             )
+            # batch_embeddings = generate_embeddings_with_retry(
+            #     data=[x.get("chunk_text") for x in batch], attempts=5, model=model
+            # )
             if len([x for x in batch_embeddings if x is not None]) == 0:
                 continue
             yield batch, batch_embeddings
@@ -84,17 +84,12 @@ class SheetChunksHandler(CorpusHandler):
         context = ""
         if doc.get("context"):
             context = "  ( > ".join(doc["context"]) + ")"
-        # print(f"Text is : {doc["text"]}")
-        # print(f"Context is : {context}")
-        # print(f"Title is : {doc['title']}")
-        # print(f"Introduction is : {doc['introduction']}")
         if doc.get("introduction") not in doc["text"]:
             chunk_text = "\n".join(
                 [doc["title"] + context, doc["introduction"], doc["text"]]
             )
         else:
             chunk_text = "\n".join([doc["title"] + context, doc["text"]])
-        # print(f"Text to embed: {chunk_text}")
 
         return chunk_text
 
@@ -246,11 +241,6 @@ def make_chunks_directories(
                 resp += f" : {personne.get('civilite', '')} {personne.get('prenom', '')} {personne.get('nom', '')}"
                 if personne.get("grade", ""):
                     resp += f" ({personne.get('grade', '')})"
-            #     if personne.get("adresse_courriel", []):
-            #         for mail in personne.get("adresse_courriel", []):
-            #             resp += f"\nEmail : {mail.get('valeur', '')} ({mail.get('libelle', '')})"
-            # if responsable.get("telephone", ""):
-            #     resp += f"\nTéléphone : {responsable.get('telephone', '')}"
             responsables_to_concatenate.append(resp)
         responsables_to_concatenate = ".\n".join(responsables_to_concatenate)
     except Exception:
@@ -328,8 +318,6 @@ def make_chunks_sheets(
                 }
 
                 chunk["chunk_text"] = doc_to_chunk(doc=chunk)
-                # print(f"Chunk text: {chunk['chunk_text']}")
-                # print("*" * 20)
                 if isinstance(natural_chunk, dict) and "context" in natural_chunk:
                     chunk["context"] = natural_chunk["context"]
                     chunk_content = "".join(chunk["context"]) + fragment

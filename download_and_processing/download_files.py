@@ -10,12 +10,6 @@ import json
 import shutil
 import wget
 
-
-# logger.basicConfig(
-#     filename="logs/data.log",
-#     level=logger.INFO,
-#     format="%(asctime)s - %(levelname)s - %(message)s",
-# )
 logger = get_logger(__name__)
 
 
@@ -33,12 +27,9 @@ def download_files(config_file_path: str, data_history_path: str):
     Raises:
         Exception: Errors are logged.
     """
-    print("im here")
-    print(f"config_file_path: {config_file_path}")
-    print(f"data_history_path: {data_history_path}")
+
     config = load_config(config_file_path=config_file_path)
     log = load_data_history(data_history_path=data_history_path)
-    print("im here2")
     for file_name, attributes in config.items():
         if attributes.get("type") == "dila_folder":
             url = attributes.get("download_url", "")
@@ -233,157 +224,3 @@ def download_files(config_file_path: str, data_history_path: str):
             logger.info(f"Corpus files {file_name} successfuly downloaded")
         else:
             logger.warning(f"Unknown type {attributes.get('type')} for {file_name}")
-
-
-# def download_files(config_file_path: str, data_history_path: str):
-#     """
-#     Downloads, unpacks, and processes data files as specified in a configuration file.
-
-#     This function performs the following steps:
-#     1. Loads configuration and data history from the specified file paths.
-#     2. Cleans and prepares download directories as defined in the configuration.
-#     3. Downloads and unpacks archives for each 'directory' type data file, retaining only JSON files and renaming them appropriately.
-#     4. For each entry in the "DILA" section of the configuration:
-#         - Scrapes the download page for available ".tar.gz" files.
-#         - Prioritizes downloading "freemium" files if present.
-#         - Downloads new archives not previously downloaded, updates the data history log, and extracts the archives.
-#     5. Handles errors and logs progress throughout the process.P
-
-#     Args:
-#         config_file_path (str): Path to the configuration JSON file specifying download URLs and directories.
-#         data_history_path (str): Path to the JSON file maintaining download history for incremental updates.
-
-#     Raises:
-#         Exception: Logs and handles any exceptions that occur during the download or extraction process.
-#     """
-
-#     config = load_config(config_file_path=config_file_path)
-#     log = load_data_history(data_history_path=data_history_path)
-
-#     # Cleaning directories folder once before processing
-#     for file_name, attributes in config["directories"].items():
-#         storage_dir = attributes.get("download_folder", "")
-#         if os.path.exists(storage_dir):
-#             shutil.rmtree(storage_dir)
-#         os.makedirs(storage_dir, exist_ok=True)
-#         logger.info(f"Directory {storage_dir} cleaned...")
-
-#     for file_name, attributes in config["directories"].items():
-#         old_files = os.listdir(storage_dir)
-
-#         logger.info(f"downloading {file_name} archive...")
-#         url = requests.head(attributes["download_url"], allow_redirects=True).url
-#         info = urlopen(url).info()
-#         file = info.get_filename() if info.get_filename() else os.path.basename(url)
-
-#         try:
-#             wget.download(attributes["download_url"], os.path.join(storage_dir, file))
-#         except Exception as e:
-#             logger.error(f"Error downloading files: {e}")
-
-#         logger.info(f"unpacking {file_name} archive...")
-#         shutil.unpack_archive(os.path.join(storage_dir, file), storage_dir)
-
-#         logger.info(f"deleting {file_name} archive...")
-#         os.remove((os.path.join(storage_dir, file)))
-
-#         new_files = [x for x in os.listdir(storage_dir) if x not in old_files]
-#         logger.debug(f"new files: {new_files}")
-
-#         for file in new_files:
-#             if not file.endswith(".json"):
-#                 logger.debug(f"deleting {file}...")
-#                 os.remove(os.path.join(storage_dir, file))
-
-#             else:
-#                 logger.debug(f"renaming {file} to {file_name}...")
-#                 os.rename(
-#                     os.path.join(storage_dir, file),
-#                     os.path.join(storage_dir, f"{file_name}.json"),
-#                 )
-
-#         logger.info("Directories successfully downloaded")
-
-#     for key, data in config["DILA"].items():
-#         url = config["DILA"].get(key, {}).get("download_url", "")
-#         download_folder = config["DILA"].get(key, {}).get("download_folder", "")
-#         last_downloaded_file = log.get(key, {}).get("last_downloaded_file", "")
-
-#         try:
-#             response = requests.get(url)
-#             response.raise_for_status()
-
-#             # Parse the HTML content using BeautifulSoup
-#             soup = BeautifulSoup(response.text, "html.parser")
-
-#             # Find all links that end with ".tar.gz"
-#             links = soup.find_all("a", href=True)
-
-#             tar_gz_files = sorted(
-#                 [link["href"] for link in links if link["href"].endswith(".tar.gz")]
-#             )
-#             # Placing the freemium file at the beginning
-#             try:
-#                 freemium_file = next(
-#                     (
-#                         file
-#                         for file in tar_gz_files
-#                         if file.lower().startswith("freemium")
-#                     ),
-#                     None,
-#                 )
-#                 tar_gz_files.remove(freemium_file)
-#                 tar_gz_files.insert(0, freemium_file)
-#             except ValueError:
-#                 logger.info(f"There is no freemium file in {url}")
-
-#             logger.info(
-#                 f"{len(tar_gz_files)} tar.gz files found in {url}: {tar_gz_files}"
-#             )
-
-#             # Ensure the download folder exists
-#             os.makedirs(download_folder, exist_ok=True)
-
-#             if last_downloaded_file in tar_gz_files:
-#                 last_file_index = tar_gz_files.index(last_downloaded_file)
-#                 logger.info(
-#                     f"Last downloaded file is {last_downloaded_file} according to the data history"
-#                 )
-#             else:
-#                 last_file_index = -1
-
-#             if last_file_index == len(tar_gz_files) - 1:
-#                 logger.info("No new files to download")
-#             else:
-#                 for file_name in tar_gz_files[
-#                     last_file_index + 1 :
-#                 ]:  # As we already downloaded the last file, we start from the next file
-#                     file_url = url + file_name
-#                     download_path = os.path.join(download_folder, file_name)
-#                     logger.info(f"Downloading {file_url} to {download_folder}")
-
-#                     file_response = requests.get(file_url)
-#                     file_response.raise_for_status()
-#                     with open(download_path, "wb") as file:
-#                         file.write(file_response.content)
-#                     logger.info(
-#                         f"Successfully downloaded {file_name} to {download_folder}"
-#                     )
-
-#                 # Update the last download file and date in the log
-#                 log[key] = {
-#                     "last_downloaded_file": file_name,
-#                     "last_download_date": datetime.now().strftime(
-#                         "%d-%m-%Y %H:%M:%S.%f"
-#                     ),
-#                 }
-
-#                 with open(data_history_path, "w") as file:
-#                     json.dump(log, file, indent=4)
-#                 logger.info(
-#                     f"Log config file successfully updated to {data_history_path}"
-#                 )
-
-#             extract_and_remove_tar_files(download_folder)
-#         except Exception as e:
-#             logger.error(f"Error downloading files: {e}")

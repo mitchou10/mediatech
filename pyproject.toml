@@ -1,6 +1,6 @@
 [project]
 name = "albert-bibliotheque"
-description = "ALBERT BIBLIOTHEQUE : Traitement des données mis à disposition publiquement par les administrations afin d'alimenter la base de connaissance d'ALBERT et de faciliter l'accès aux données publiques vectorisées dans la fonction publique."
+description = "ALBERT BIBLIOTHEQUE : Traitement des données mis à disposition publiquement par les administrations afin d'alimenter la base de connaissance d'ALBERT API et de faciliter l'accès aux données publiques vectorisées dans la fonction publique."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
