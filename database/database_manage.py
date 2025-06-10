@@ -255,7 +255,7 @@ def create_tables(model="BAAI/bge-m3", delete_existing: bool = False):
                             titre TEXT,
                             titre_complet TEXT,
                             sous_titres TEXT,
-                            numero INTEGER,
+                            numero TEXT,
                             date_debut TEXT,
                             date_fin TEXT,
                             nota TEXT,
