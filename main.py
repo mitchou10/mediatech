@@ -16,15 +16,15 @@ Commands:
     export_tables           Export tables to Parquet files
 
 Options:
-    --config-file=<path>    Path to the config file [default: config_file_path]
-    --history-file=<path>   Path to the data history file [default: data_history_path]
+    --config-file=<path>    Path to the config file 
+    --history-file=<path>   Path to the data history file
     --delete-existing       Delete existing tables before creating new ones
     --all                   Process all unprocessed data
     --model=<model_name>    Embedding model name [default: BAAI/bge-m3]. It is mandatory to specify the same model for all commands.
     --source=<source>       Source to process (service_public, travail_emploi, legi, cnil,
                             state_administrations_directory, local_administrations_directory, constit, dole)
     --folder=<path>         Folder containing unprocessed data [default: data/unprocessed]
-    --output=<path>         Output folder for Parquet files [default: parquet_files_folder]
+    --output=<path>         Output folder for Parquet files [default: data/parquet]
     -h --help               Show this help message
 
 Examples:
@@ -71,6 +71,7 @@ def main():
             logger.info(
                 f"Downloading files using config: {config_file_path} and history: {data_history_path}"
             )
+
             download_files(
                 config_file_path=config_file_path,
                 data_history_path=data_history_path,

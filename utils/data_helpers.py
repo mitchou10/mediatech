@@ -215,24 +215,22 @@ def remove_file(file_path: str):
     if os.path.exists(file_path):
         try:
             os.remove(file_path)
-            logger.info(f"Removed file: {file_path}")
+            logger.debug(f"Removed file: {file_path}")
         except Exception as e:
             logger.error(f"Error removing file {file_path}: {e}")
     else:
         logger.info(f"File {file_path} does not exist")
-
 
 def export_tables_to_parquet(output_folder: str = parquet_files_folder):
     """
     Exports all tables from the postgresql database to Parquet files.
 
     Args:
-        parquet_files_folder (str): The path where the Parquet files will be saved.
+        output_folder (str): The path where the Parquet files will be saved.
 
     Returns:
         None
     """
-
     try:
         conn = psycopg2.connect(
             host=POSTGRES_HOST,
@@ -249,27 +247,48 @@ def export_tables_to_parquet(output_folder: str = parquet_files_folder):
         tables = cursor.fetchall()
         tables = [table[0] for table in tables]
         os.makedirs(output_folder, exist_ok=True)
+        
         for table_name in tables:
-            cursor.execute(f"SELECT * FROM {table_name}")
-            columns = [desc[0] for desc in cursor.description]
-            rows = cursor.fetchall()
-
-            output_path = f"{parquet_files_folder}/{table_name}.parquet"
-            if rows:
-                logger.info(
-                    f"Exporting table '{table_name}' to Parquet file: {output_path}"
-                )
-                df = pl.DataFrame(rows, schema=columns, orient="row")
-                df.write_parquet(output_path)
-                logger.info(
-                    f"Sucessfully exported table '{table_name}' to Parquet file: {output_path}"
-                )
-            else:
-                logger.warning(
-                    f"No data found in table '{table_name}'. No Parquet file created."
-                )
+            try:
+                # Get row count from table using SQL COUNT
+                cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                table_row_count = cursor.fetchone()[0]
+                
+                cursor.execute(f"SELECT * FROM {table_name}")
+                columns = [desc[0] for desc in cursor.description]
+                rows = cursor.fetchall()
+                
+                output_path = f"{output_folder}/{table_name}.parquet"
+                if table_row_count > 0:
+                    logger.info(
+                        f"Exporting {table_row_count} rows from table '{table_name}' to Parquet file: {output_path}"
+                    )
+                    df = pl.DataFrame(rows, schema=columns, orient="row")
+                    df.write_parquet(output_path)
+                    
+                    # Vérifier le nombre de lignes dans le fichier parquet créé
+                    verification_df = pl.read_parquet(output_path)
+                    parquet_row_count = len(verification_df)
+                    
+                    if table_row_count == parquet_row_count:
+                        logger.info(
+                            f"Successfully exported table '{table_name}': {table_row_count} rows from table → {parquet_row_count} rows in parquet file ✓"
+                        )
+                    else:
+                        logger.warning(
+                            f"Row count mismatch for table '{table_name}': {table_row_count} rows from table → {parquet_row_count} rows in parquet file"
+                        )
+                else:
+                    logger.warning(
+                        f"No data found in table '{table_name}'. No Parquet file created."
+                    )
+                    
+            except Exception as table_error:
+                logger.error(f"Error processing table '{table_name}': {table_error}")
+                continue
+                
     except Exception as e:
-        logger.error(f"Error exporting table '{table_name}' to Parquet: {e}")
+        logger.error(f"Error connecting to database or exporting tables: {e}")
     finally:
         if "conn" in locals():
             conn.close()
