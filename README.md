@@ -68,7 +68,7 @@ Exemples de commandes :
   ```bash
   python main.py download_files
   ```
-- Créer les tables :  
+- Créer les tables PostgreSQL:  
   ```bash
   python main.py create_tables --model BAAI/bge-m3
   ```
@@ -76,10 +76,15 @@ Exemples de commandes :
   ```bash
   python main.py process_files --all --model BAAI/bge-m3
   ```
-- Exporter les tables :  
+- Exporter les tables PostgreSQL en fichier parquet:  
   ```bash
   python main.py export_tables --output data/parquet
   ```
+- Téléverser les dataset en format parquet sur le repository Hugging Face:
+  ```bash
+  python main.py upload_dataset --input data/parquet/service_public.parquet --dataset-name service-public
+  ```
+
 
 Executez `python main.py --help` dans votre terminal pour voir toutes les options disponibles, ou consultez directement le code contenu dans [`main.py`](main.py).
 
