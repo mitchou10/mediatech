@@ -2,6 +2,7 @@ import os
 import shutil
 import re
 import json
+import hashlib
 import tarfile
 import polars as pl
 import psycopg2
@@ -127,6 +128,23 @@ def format_model_name(model_name: str) -> str:
     return model_name.partition("/")[2]
 
 
+def file_md5(path) -> str:
+    """
+    Calculate the MD5 hash of a file.
+
+    Args:
+        path (str): The file path to calculate the MD5 hash for.
+
+    Returns:
+        str: The hexadecimal representation of the MD5 hash.
+    """
+    hash_md5 = hashlib.md5()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
 def make_schedule(plages: list) -> str:
     """
     Generates a formatted schedule string from a list of time slot dictionaries.
@@ -221,6 +239,7 @@ def remove_file(file_path: str):
     else:
         logger.info(f"File {file_path} does not exist")
 
+
 def export_tables_to_parquet(output_folder: str = parquet_files_folder):
     """
     Exports all tables from the postgresql database to Parquet files.
@@ -247,17 +266,17 @@ def export_tables_to_parquet(output_folder: str = parquet_files_folder):
         tables = cursor.fetchall()
         tables = [table[0] for table in tables]
         os.makedirs(output_folder, exist_ok=True)
-        
+
         for table_name in tables:
             try:
                 # Get row count from table using SQL COUNT
                 cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
                 table_row_count = cursor.fetchone()[0]
-                
+
                 cursor.execute(f"SELECT * FROM {table_name}")
                 columns = [desc[0] for desc in cursor.description]
                 rows = cursor.fetchall()
-                
+
                 output_path = f"{output_folder}/{table_name}.parquet"
                 if table_row_count > 0:
                     logger.info(
@@ -265,11 +284,11 @@ def export_tables_to_parquet(output_folder: str = parquet_files_folder):
                     )
                     df = pl.DataFrame(rows, schema=columns, orient="row")
                     df.write_parquet(output_path)
-                    
+
                     # Vérifier le nombre de lignes dans le fichier parquet créé
                     verification_df = pl.read_parquet(output_path)
                     parquet_row_count = len(verification_df)
-                    
+
                     if table_row_count == parquet_row_count:
                         logger.info(
                             f"Successfully exported table '{table_name}': {table_row_count} rows from table → {parquet_row_count} rows in parquet file ✓"
@@ -282,21 +301,16 @@ def export_tables_to_parquet(output_folder: str = parquet_files_folder):
                     logger.warning(
                         f"No data found in table '{table_name}'. No Parquet file created."
                     )
-                    
+
             except Exception as table_error:
                 logger.error(f"Error processing table '{table_name}': {table_error}")
                 continue
-                
+
     except Exception as e:
         logger.error(f"Error connecting to database or exporting tables: {e}")
     finally:
         if "conn" in locals():
             conn.close()
-
-
-def export_parquet_to_huggingface(table_name: str):
-    return
-
 
 ### Imported functions from the pyalbert library
 
@@ -305,17 +319,12 @@ def doc_to_chunk(doc: dict) -> str | None:
     context = ""
     if doc.get("context"):
         context = "  ( > ".join(doc["context"]) + ")"
-    # print(f"Text is : {doc["text"]}")
-    # print(f"Context is : {context}")
-    # print(f"Title is : {doc['title']}")
-    # print(f"Introduction is : {doc['introduction']}")
     if doc.get("introduction") not in doc["text"]:
         chunk_text = "\n".join(
             [doc["title"] + context, doc["introduction"], doc["text"]]
         )
     else:
         chunk_text = "\n".join([doc["title"] + context, doc["text"]])
-    # print(f"Text to embed: {chunk_text}")
 
     return chunk_text
 

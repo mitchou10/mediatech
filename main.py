@@ -7,6 +7,7 @@ Usage:
     main.py create_tables [--model=<model_name>] [--delete-existing]
     main.py process_files (--all | --source=<source>) [--folder=<path>] [--model=<model_name>]
     main.py export_tables [--output=<path>]
+    main.py upload_dataset [--input=<path>] [--dataset-name=<name>] [--private]
     main.py -h | --help
 
 Commands:
@@ -14,9 +15,10 @@ Commands:
     create_tables           Create database tables (with option to delete existing ones)
     process_files           Process data from specific source or all sources and insert into database
     export_tables           Export tables to Parquet files
+    upload_dataset          Upload dataset to Hugging Face
 
 Options:
-    --config-file=<path>    Path to the config file 
+    --config-file=<path>    Path to the config file
     --history-file=<path>   Path to the data history file
     --delete-existing       Delete existing tables before creating new ones
     --all                   Process all unprocessed data
@@ -24,6 +26,8 @@ Options:
     --source=<source>       Source to process (service_public, travail_emploi, legi, cnil,
                             state_administrations_directory, local_administrations_directory, constit, dole)
     --folder=<path>         Folder containing unprocessed data [default: data/unprocessed]
+    --input=<path>          Input path of the dataset to upload
+    --dataset-name=<name>   Name of the dataset to upload to Hugging Face
     --output=<path>         Output folder for Parquet files [default: data/parquet]
     -h --help               Show this help message
 
@@ -33,6 +37,7 @@ Examples:
     main.py process_files --source service_public --model BAAI/bge-m3
     main.py process_files --all --folder data/unprocessed --model BAAI/bge-m3
     main.py export_tables --output data/parquet
+    main.py upload_dataset --input data/parquet/service_public.parquet --dataset-name service-public
 """
 
 from docopt import docopt
@@ -48,6 +53,7 @@ from config import (
     TRAVAIL_EMPLOI_DATA_FOLDER,
     SERVICE_PUBLIC_PRO_DATA_FOLDER,
     SERVICE_PUBLIC_PART_DATA_FOLDER,
+    HF_TOKEN,
     DOLE_DATA_FOLDER,
     parquet_files_folder,
     config_file_path,
@@ -81,7 +87,6 @@ def main():
         elif args["create_tables"]:
             delete_existing = True if args["--delete-existing"] else False
             model = args["--model"] if args["--model"] else "BAAI/bge-m3"
-            print(model)
             logger.info(
                 f"Creating tables with model {model} (delete_existing={delete_existing})"
             )
@@ -128,7 +133,24 @@ def main():
             logger.info(f"Exporting tables to Parquet in folder: {output}")
             export_tables_to_parquet(output_folder=output)
 
+        # Upload dataset to Hugging Face
+        elif args["upload_dataset"]:
+            from utils import HuggingFace
+
+            input_path = args["--input"]
+            dataset_name = args["--dataset-name"]
+            private = True if args["--private"] else False
+
+            logger.info(
+                f"Uploading dataset {dataset_name} from {input_path} to Hugging Face (private={private})"
+            )
+            hf = HuggingFace(hugging_face_repo="AgentPublic", token=HF_TOKEN)
+            hf.upload_dataset(
+                dataset_name=dataset_name, file_path=input_path, private=private
+            )
+
         return 0
+
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         return 1

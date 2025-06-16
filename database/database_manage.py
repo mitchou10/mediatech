@@ -15,11 +15,6 @@ from config import (
 )
 from utils import generate_embeddings, format_model_name
 
-# logger.basicConfig(
-#     filename="logs/data.log",
-#     level=logger.INFO,
-#     format="%(asctime)s - %(levelname)s - %(message)s",
-# )
 logger = get_logger(__name__)
 
 
@@ -58,7 +53,7 @@ def create_tables(model="BAAI/bge-m3", delete_existing: bool = False):
 
         model_name = format_model_name(model)
 
-        # Vérification de l'extension pgvector
+        # Enabling Pgvector extension
         try:
             cursor.execute("CREATE EXTENSION IF NOT EXISTS vector;")
             conn.commit()
@@ -460,7 +455,7 @@ def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
         cursor.executemany(insert_query, data)
         conn.commit()
         conn.close()
-        # logger.info(f"Data inserted into PostgreSQL database")
+        logger.debug("Data inserted into PostgreSQL database")
     except Exception as e:
         logger.error(f"Error inserting data into PostgreSQL: {e}\n{data}")
 

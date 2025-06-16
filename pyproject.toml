@@ -21,7 +21,8 @@ dependencies = [
     "fastembed==0.6.1",
     "qdrant-client==1.14.2",
     "langchain==0.3.25",
-    "lxml==5.4.0"
+    "lxml==5.4.0",
+    "huggingface-hub==0.32.6"
 ]
 
 [project.urls]
