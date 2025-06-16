@@ -18,6 +18,7 @@ from .config import (
     POSTGRES_PASSWORD,
     API_URL,
     API_KEY,
+    HF_TOKEN,
 )
 
 from .logging_config import setup_logging, get_logger

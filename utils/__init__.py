@@ -17,8 +17,10 @@ from .data_helpers import (
     load_data_history,
     load_config,
     doc_to_chunk,
-    format_model_name
+    format_model_name,
+    file_md5
 )
 
+from .hugging_face import HuggingFace
 
 from .sheets_parser import RagSource

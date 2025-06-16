@@ -29,15 +29,6 @@ from datetime import datetime
 from openai import PermissionDeniedError
 from tqdm import tqdm
 
-# logger.getLogger("httpx").setLevel(logger.WARNING)
-# logger.getLogger("openai").setLevel(logger.WARNING)
-
-# logger.basicConfig(
-#     filename="logs/data.log",
-#     level=logger.INFO,
-#     format="%(asctime)s - %(levelname)s - %(message)s",
-# )
-
 logger = get_logger(__name__)
 
 
@@ -741,7 +732,7 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
             f"Folder: {base_folder} successfully processed and data successfully inserted into the postgres database"
         )
 
-        # remove_folder(folder_path=base_folder)
+        remove_folder(folder_path=base_folder)
 
     elif base_folder in [
         SERVICE_PUBLIC_PRO_DATA_FOLDER,

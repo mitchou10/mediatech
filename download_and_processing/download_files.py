@@ -101,7 +101,7 @@ def download_files(config_file_path: str, data_history_path: str):
                     log[file_name] = {
                         "last_downloaded_file": filename,
                         "last_download_date": datetime.now().strftime(
-                            "%d-%m-%Y %H:%M:%S.%f"
+                            "%d-%m-%Y %H:%M:%S"
                         ),
                     }
 
@@ -157,7 +157,7 @@ def download_files(config_file_path: str, data_history_path: str):
                     log[file_name] = {
                         "last_downloaded_file": downloaded_file,
                         "last_download_date": datetime.now().strftime(
-                            "%d-%m-%Y %H:%M:%S.%f"
+                            "%d-%m-%Y %H:%M:%S"
                         ),
                     }
 
@@ -214,7 +214,7 @@ def download_files(config_file_path: str, data_history_path: str):
             # Update the last download file and date in the log
             log[file_name] = {
                 "last_downloaded_file": f"{downloaded_file_name}",
-                "last_download_date": datetime.now().strftime("%d-%m-%Y %H:%M:%S.%f"),
+                "last_download_date": datetime.now().strftime("%d-%m-%Y %H:%M:%S"),
             }
 
             with open(data_history_path, "w") as file:

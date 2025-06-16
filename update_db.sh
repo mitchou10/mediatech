@@ -14,3 +14,6 @@ python main.py download_files
 python main.py create_tables --model BAAI/bge-m3
 python main.py process_files --all --model BAAI/bge-m3
 python main.py export_tables
+python main.py upload_dataset --input data/parquet/state_administrations_directory.parquet --dataset-name state-administrations-directory
+python main.py upload_dataset --input data/parquet/service_public.parquet --dataset-name service-public
+python main.py upload_dataset --input data/parquet/travail_emploi.parquet --dataset-name travail-emploi 
