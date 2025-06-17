@@ -42,7 +42,7 @@ SERVICE_PUBLIC_PART_DATA_FOLDER = os.getenv(
 )
 
 # OpenAI API configuration
-API_URL = os.getenv("API_URL", "https://albert.api.staging.etalab.gouv.fr/v1")
+API_URL = os.getenv("API_URL", "https://albert.api.etalab.gouv.fr/v1")
 API_KEY = os.getenv("API_KEY", "your_api_key_here")
 
 # Hugging Face configuration

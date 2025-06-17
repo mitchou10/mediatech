@@ -1,8 +1,7 @@
 import os
 import xml.etree.ElementTree as ET
 import json
-import time
-from database import insert_data
+from database import insert_data, remove_data
 from config import (
     get_logger,
     CNIL_DATA_FOLDER,
@@ -759,11 +758,32 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
             all_dirs.remove("cnil")
             all_dirs.insert(0, "cnil")  # Placing the 'cnil' folder at the beginning
         except ValueError:
-            logger.info(f"There is no 'cnil' directory in {base_folder}")
+            logger.debug(f"There is no 'cnil' directory in {base_folder}")
 
         for (
             root_dir
         ) in all_dirs:  # root_dir is the name of each folder inside the base_folder
+            # Remove obscolete CIDs from the table based on the suppression list file
+            for entity in os.listdir(os.path.join(base_folder, root_dir)):
+                if entity.startswith("liste_suppression"):
+                    try:
+                        cid_to_remove = []
+                        with open(os.path.join(base_folder, root_dir, entity)) as f:
+                            lines = f.readlines()
+                        cid_to_remove = [
+                            line.strip().split("/")[-1]
+                            for line in lines
+                            if line.strip()
+                        ]
+                        logger.info(
+                            f"Removing {len(cid_to_remove)} CIDs from the 'CNIL' table based on {entity}"
+                        )
+                        for cid in cid_to_remove:
+                            remove_data(table_name="cnil", column="cid", value=cid)
+                    except Exception as e:
+                        logger.error(f"Error reading {entity}: {e}")
+                        continue
+            # Process the XML files in the target directory
             target_dir = os.path.join(base_folder, root_dir, "cnil/global/CNIL/TEXT")
             folder_to_remove = os.path.join(base_folder, root_dir)
             if root_dir == "cnil":
@@ -790,11 +810,32 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
             all_dirs.remove("constit")
             all_dirs.insert(0, "constit")  # Placing the 'cnil' folder at the beginning
         except ValueError:
-            logger.info(f"There is no 'constit' directory in {base_folder}")
+            logger.debug(f"There is no 'constit' directory in {base_folder}")
 
         for (
             root_dir
         ) in all_dirs:  # root_dir is the name of each folder inside the base_folder
+            # Remove obscolete CIDs from the table based on the suppression list file
+            for entity in os.listdir(os.path.join(base_folder, root_dir)):
+                if entity.startswith("liste_suppression"):
+                    try:
+                        cid_to_remove = []
+                        with open(os.path.join(base_folder, root_dir, entity)) as f:
+                            lines = f.readlines()
+                        cid_to_remove = [
+                            line.strip().split("/")[-1]
+                            for line in lines
+                            if line.strip()
+                        ]
+                        logger.info(
+                            f"Removing {len(cid_to_remove)} CIDs from the 'CONSTIT' table based on {entity}"
+                        )
+                        for cid in cid_to_remove:
+                            remove_data(table_name="constit", column="cid", value=cid)
+                    except Exception as e:
+                        logger.error(f"Error reading {entity}: {e}")
+                        continue
+            # Process the XML files in the target directory
             target_dir = os.path.join(base_folder, root_dir, "constit/global/CONS/TEXT")
             folder_to_remove = os.path.join(base_folder, root_dir)
             if root_dir == "constit":
@@ -823,11 +864,32 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
             all_dirs.remove("legi")
             all_dirs.insert(0, "legi")  # Placing the 'legi' folder at the beginning
         except ValueError:
-            logger.info(f"There is no 'legi' directory in {base_folder}")
+            logger.debug(f"There is no 'legi' directory in {base_folder}")
 
         for (
             root_dir
         ) in all_dirs:  # root_dir is the name of each folder inside the base_folder
+            # Remove obscolete CIDs from the table based on the suppression list file
+            for entity in os.listdir(os.path.join(base_folder, root_dir)):
+                if entity.startswith("liste_suppression"):
+                    try:
+                        cid_to_remove = []
+                        with open(os.path.join(base_folder, root_dir, entity)) as f:
+                            lines = f.readlines()
+                        cid_to_remove = [
+                            line.strip().split("/")[-1]
+                            for line in lines
+                            if line.strip()
+                        ]
+                        logger.info(
+                            f"Removing {len(cid_to_remove)} CIDs from the 'LEGI' table based on {entity}"
+                        )
+                        for cid in cid_to_remove:
+                            remove_data(table_name="legi", column="cid", value=cid)
+                    except Exception as e:
+                        logger.error(f"Error reading {entity}: {e}")
+                        continue
+            # Process the XML files in the target directory
             target_dir = os.path.join(
                 base_folder, root_dir, "legi/global/code_et_TNC_en_vigueur"
             )

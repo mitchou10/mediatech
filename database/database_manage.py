@@ -561,3 +561,36 @@ def postgres_to_qdrant(
         conn.close()
     except Exception as e:
         logger.error(f"Error inserting data into Qdrant: {e}")
+
+
+def remove_data(table_name: str, column: str, value: str):
+    """
+    Remove data from a PostgreSQL table based on a specific column and value.
+
+    Args:
+        table_name (str): Name of the PostgreSQL table to remove data from.
+        column (str): Column name to filter the rows to be removed.
+        value (str): Value in the specified column to match for removal.
+
+    Raises:
+        Exception: Any error encountered during database operations is logged.
+    """
+    try:
+        conn = psycopg2.connect(
+            host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
+            dbname=POSTGRES_DB,
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD,
+        )
+        cursor = conn.cursor()
+
+        delete_query = f"DELETE FROM {table_name.upper()} WHERE {column} = %s"
+        cursor.execute(delete_query, (value,))
+        conn.commit()
+        conn.close()
+        logger.info(
+            f"Data removed from {table_name.upper()} table where {column} = {value} (if exists)"
+        )
+    except Exception as e:
+        logger.error(f"Error removing data from PostgreSQL: {e}")

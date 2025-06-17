@@ -80,7 +80,7 @@ Exemples de commandes :
   ```bash
   python main.py export_tables --output data/parquet
   ```
-- Téléverser les dataset en format parquet sur le repository Hugging Face:
+- Téléverser les datasets en format parquet sur le repository Hugging Face:
   ```bash
   python main.py upload_dataset --input data/parquet/service_public.parquet --dataset-name service-public
   ```
