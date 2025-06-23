@@ -4,6 +4,7 @@ import os
 import json
 import hashlib
 import time
+import re
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from typing import Optional
 from collections import defaultdict
@@ -34,7 +35,6 @@ class CorpusHandler(ABC):
     def create_handler(cls, corpus_name: str, corpus: list[dict]) -> "CorpusHandler":
         """Get the appropriate handler subclass from the string corpus name."""
         corpuses = {
-            # "spp_experiences": SppExperiencesHandler, # Legacy from pyalbert, unused here
             TRAVAIL_EMPLOI_DATA_FOLDER.split("/")[-1]: SheetChunksHandler,
             SERVICE_PUBLIC_PRO_DATA_FOLDER.split("/")[-1]: SheetChunksHandler,
             SERVICE_PUBLIC_PART_DATA_FOLDER.split("/")[-1]: SheetChunksHandler,
@@ -168,7 +168,9 @@ def generate_embeddings_with_retry(
             time.sleep(3)  # Waiting 3 seconds before retrying
 
 
-def make_chunks(text: str, chunk_size: int = 1500, chunk_overlap: int = 200):
+def make_chunks(
+    text: str, chunk_size: int = 1500, chunk_overlap: int = 200
+) -> list[str]:
     """
     Splits the input text into overlapping chunks using a recursive character-based text splitter.
     Args:
@@ -178,7 +180,9 @@ def make_chunks(text: str, chunk_size: int = 1500, chunk_overlap: int = 200):
     Returns:
         List[str]: A list of text chunks generated from the input text.
     """
-
+    if not text:
+        logger.debug("Empty text provided for chunking.")
+        return []
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
@@ -363,3 +367,219 @@ def make_chunks_sheets(
     logger.info(f"Info summary:\n {str(json_file_target)}")
 
     logger.info(f"Chunks created in : {str(json_file_target)}")
+
+
+def dole_cut_file_content(text: str):
+    """
+    Splits legal text into individual articles based on article numbering patterns.
+    
+    Args:
+        text (str): The legal document text to be split into articles.
+        
+    Returns:
+        list: A list of dictionaries containing 'article_number' and 'article_text' keys.
+              Returns single item with None article_number if no articles found.
+    """
+    article_pattern = re.compile(r"Article\s+(?:\d{1,2}(?!-)(?:er)?|unique)\b")
+    article_match = article_pattern.search(text)
+
+    if not text:
+        logger.debug("Empty text provided for cutting.")
+        return [{"article_number": None, "article_text": ""}]
+    if article_match is None:
+        return [{"article_number": None, "article_text": text.strip()}]
+    else:
+        all_articles = []
+
+        # Finding all articles in the text
+        matches = []
+        for m in article_pattern.finditer(text):
+            matches.append(m)
+        if matches:
+            for match in matches:
+                start = match.start()
+                num_match = re.search(r"\d+", match.group())
+                if num_match is not None:
+                    article_num = int(num_match.group())
+                    # Finding the end of the article (next article with a strictly higher number)
+                    next_start = len(text)
+                    for next_match in matches:
+                        next_num_match = re.search(r"\d+", next_match.group())
+                        if next_num_match and int(next_num_match.group()) > article_num:
+                            next_start = next_match.start()
+                            break
+                    article_text = text[start:next_start].strip()
+                    all_articles.append(
+                        {
+                            "article_number": article_num,
+                            "article_text": article_text.replace("\n\n", "\n"),
+                        }
+                    )
+            return all_articles
+        else:
+            print("No articles found in the text.")
+            return []
+
+
+def dole_cut_exp_memo(text: str, section: str) -> str:
+    """
+    Extract and parse legal document sections (introduction or articles) from French legal text.
+    
+    Args:
+        text (str): The legal document text to parse
+        section (str): Section type to extract - "introduction" or "articles"
+    
+    Returns:
+        str: Introduction text if section="introduction"
+        list: List of article dictionaries if section="articles", each containing
+              article_number, article_synthesis, and title_content
+        str: Empty string if text is empty or no content found
+    """
+    def get_number_of_articles(text: str) -> int:
+        # Finding all occurrences of "Article n" or "Article n-er"
+        pattern = re.compile(r"(?:L['’] ?)?[Aa]rticle\s+(?:\d{1,2})(?!-)(?:er)?\b")
+        number_pattern = re.compile(r"\d{1,2}")
+        matches = pattern.findall(text)
+        if matches:
+            try:
+                # Extract numbers from matches
+                # Using regex to find numbers in the matches
+                numbers = [
+                    int(number_pattern.search(m).group())
+                    for m in matches
+                    if number_pattern.search(m)
+                ]
+                # Return the maximum
+                return max(numbers)
+            except ValueError:
+                # If conversion fails, return 0
+                print("matches:", matches)
+                logger.debug("Error converting article numbers to integers.")
+                return 0
+        else:
+            return 0
+
+    if not text:
+        logger.debug("Empty text provided for cutting.")
+        return ""
+    article_pattern = re.compile(
+        r"(?:L['’] ?a|(?<!')A|l['’]a)rticle\s+\d{1,2}(?!-)(?:er)?\b"
+    )
+    title_pattern = re.compile(r"(TITRE\s+\w+)")
+
+    # Finding the first occurrence of TITRE or Article
+    titre_match = title_pattern.search(text)
+    article_match = article_pattern.search(text)
+
+    # Determine the introduction and the rest of the text
+    if titre_match:
+        intro = text[: titre_match.start()].strip()
+        rest = text[titre_match.start() :].strip()
+    elif article_match and not titre_match:
+        intro = text[: article_match.start()].strip()
+        rest = text[article_match.start() :].strip()
+    else:
+        intro = None
+        rest = text.strip()
+
+    if section.lower() == "introduction":
+        return intro
+
+    elif section.lower() == "articles":
+        number_of_articles = get_number_of_articles(text=text)
+        all_articles = []
+
+        # Finding all articles and titles in the rest of the text
+        matches = []
+        for m in article_pattern.finditer(rest):
+            matches.append(("article", m))
+        for m in title_pattern.finditer(rest):
+            matches.append(("title", m))
+
+        if matches:
+            # Sort matches by their start position
+            matches.sort(key=lambda x: x[1].start())
+
+            articles_texts = {}
+            title_ranges = []
+
+            # Preparing title ranges
+            for idx, (kind, match) in enumerate(matches):
+                if kind == "title":
+                    title_start = match.start()
+                    # Finding the end of the title
+                    title_end = len(rest)
+                    for next_idx in range(idx + 1, len(matches)):
+                        if matches[next_idx][0] in ("title", "article"):
+                            title_end = matches[next_idx][1].start()
+                            break
+                    title_content = rest[title_start:title_end].strip()
+                    title_ranges.append(
+                        {
+                            "title_start": title_start,
+                            "title_end": title_end,
+                            "title_content": title_content,
+                        }
+                    )
+
+            # Associating articles with their titles
+            for idx, (kind, match) in enumerate(matches):
+                if kind != "article":
+                    continue
+                start = match.start()
+                num_match = re.search(r"\d+", match.group())
+                if num_match is not None:
+                    article_num = int(num_match.group())
+                    # Finding the end of the article (next article with a strictly higher number)
+                    next_start = len(rest)
+                    for next_idx in range(idx + 1, len(matches)):
+                        next_kind, next_match = matches[next_idx]
+                        if next_kind == "article":
+                            next_num_match = re.search(r"\d+", next_match.group())
+                            if (
+                                next_num_match
+                                and int(next_num_match.group()) > article_num
+                            ):
+                                next_start = next_match.start()
+                                break
+                        elif next_kind == "title":
+                            next_start = next_match.start()
+                            break
+                    article_text = rest[start:next_start].strip()
+
+                    # Finding the title content for this article
+                    title_content = None
+
+                    for idx, title in enumerate(title_ranges):
+                        t_start = title["title_start"]
+                        t_end = (
+                            title_ranges[idx + 1]["title_start"]
+                            if idx + 1 < len(title_ranges)
+                            else len(rest)
+                        )
+                        t_content = title["title_content"]
+                        if t_start < start < t_end:
+                            title_content = t_content
+                            break
+
+                    articles_texts[article_num] = {
+                        "article_number": article_num,
+                        "article_synthesis": article_text,
+                        "title_content": title_content,
+                    }
+
+            for number in range(1, number_of_articles + 1):
+                article_dict = articles_texts.get(
+                    number,
+                    {
+                        "article_number": number,
+                        "article_synthesis": "",
+                        "title_content": "",
+                    },
+                )
+                all_articles.append(article_dict)
+
+            return all_articles
+        else:
+            logger.debug("No articles found in the text.")
+            return []

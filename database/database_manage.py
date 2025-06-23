@@ -228,11 +228,16 @@ def create_tables(model="BAAI/bge-m3", delete_existing: bool = False):
                             chunk_id TEXT PRIMARY KEY,
                             cid TEXT NOT NULL,
                             chunk_number INTEGER NOT NULL,
-                            nature TEXT,
-                            type TEXT,
-                            titre TEXT,
-                            numero TEXT,
-                            date TEXT,
+                            category TEXT,
+                            content_type TEXT,
+                            title TEXT,
+                            number TEXT,
+                            wording TEXT,
+                            creation_date TEXT,
+                            article_number INTEGER,
+                            article_title TEXT,
+                            article_synthesis TEXT,
+                            article_text TEXT,
                             chunk_text TEXT,
                             "embeddings_{model_name}" vector({embedding_size}),
                             UNIQUE(chunk_id)
@@ -423,6 +428,26 @@ def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
                 titre = EXCLUDED.titre,
                 numero = EXCLUDED.numero,
                 date_decision = EXCLUDED.date_decision,
+                chunk_text = EXCLUDED.chunk_text,
+                "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
+            """
+        elif table_name.lower() == "dole":
+            insert_query = f"""
+                INSERT INTO DOLE (chunk_id, cid, chunk_number, category, content_type, title, number, wording, creation_date, article_number, article_title, article_synthesis, article_text, chunk_text, "embeddings_{model_name}")
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (chunk_id) DO UPDATE SET
+                cid = EXCLUDED.cid,
+                chunk_number = EXCLUDED.chunk_number,
+                category = EXCLUDED.category,
+                content_type = EXCLUDED.content_type,
+                title = EXCLUDED.title,
+                number = EXCLUDED.number,
+                wording = EXCLUDED.wording,
+                creation_date = EXCLUDED.creation_date,
+                article_number = EXCLUDED.article_number,
+                article_title = EXCLUDED.article_title,
+                article_synthesis = EXCLUDED.article_synthesis,
+                article_text = EXCLUDED.article_text,
                 chunk_text = EXCLUDED.chunk_text,
                 "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
             """

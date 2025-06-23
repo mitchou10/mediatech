@@ -77,7 +77,7 @@ def extract_and_remove_tar_files(download_folder: str):
         download_folder (str): The path to the folder containing `.tar.gz` files.
 
     Logs:
-        - A warning if the folder does not exist or is empty.
+        - A debug if the folder does not exist or is empty.
         - Information about each `.tar.gz` file found, extracted, and removed.
         - An error if there is an issue during extraction or removal.
 
@@ -85,10 +85,10 @@ def extract_and_remove_tar_files(download_folder: str):
         None: Any exceptions during extraction or removal are logged but not raised.
     """
     if not os.path.exists(download_folder):
-        logger.warning(f"Folder {download_folder} does not exist")
+        logger.debug(f"Folder {download_folder} does not exist")
         return
     if not os.listdir(download_folder):
-        logger.warning(f"Folder {download_folder} is empty")
+        logger.debug(f"Folder {download_folder} is empty")
         return
     for file_name in os.listdir(download_folder):
         if file_name.endswith(".tar.gz"):
