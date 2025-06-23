@@ -832,7 +832,10 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                             )
 
                             for chunk_number, chunk in enumerate(chunks):
-                                chunk_text = f"{title}\nArticle {result.get('article_number', '')}:\n{chunk}"
+                                if chunk_number == 0:
+                                    chunk_text = f"{title}\n{chunk}"
+                                else:
+                                    chunk_text = f"{title}\nArticle {result.get('article_number', '')}:\n{chunk}"  # Adding the chunk number to remind which article number the chunk is related to
                                 try:
                                     embeddings = generate_embeddings_with_retry(
                                         data=chunk_text, attempts=5, model="BAAI/bge-m3"
