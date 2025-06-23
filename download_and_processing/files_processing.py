@@ -20,6 +20,8 @@ from utils import (
     make_chunks,
     make_chunks_directories,
     make_chunks_sheets,
+    dole_cut_file_content,
+    dole_cut_exp_memo,
     remove_folder,
     remove_file,
     make_schedule,
@@ -379,17 +381,17 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                         )
                         data_to_insert = []
 
-                        for k, chunk_text in enumerate(chunks):
+                        for chunk_number, chunk_text in enumerate(chunks):
                             try:
                                 embeddings = generate_embeddings_with_retry(
                                     data=chunk_text, attempts=5, model=model
                                 )[0]
-                                chunk_id = f"{cid}_{k}"  # Unique ID for each chunk, starting from 0
+                                chunk_id = f"{cid}_{chunk_number}"  # Unique ID for each chunk, starting from 0
 
                                 new_data = (
                                     chunk_id,  # Primary key
                                     cid,  # Original document ID
-                                    k,  # Chunk number
+                                    chunk_number,  # Chunk number
                                     nature,
                                     etat,
                                     titre,
@@ -405,7 +407,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                 data_to_insert.append(new_data)
                             except PermissionDeniedError as e:
                                 logger.error(
-                                    f"PermissionDeniedError (API key issue) for chunk {k} of file {file_path}: {e}"
+                                    f"PermissionDeniedError (API key issue) for chunk {chunk_number} of file {file_path}: {e}"
                                 )
                                 raise
 
@@ -462,18 +464,18 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                         )
                         data_to_insert = []
 
-                        for k, chunk_text in enumerate(chunks):
+                        for chunk_number, chunk_text in enumerate(chunks):
                             try:
                                 embeddings = generate_embeddings_with_retry(
                                     data=chunk_text, attempts=5, model=model
                                 )[0]
 
-                                chunk_id = f"{cid}_{k}"  # Unique ID for each chunk, starting from 0
+                                chunk_id = f"{cid}_{chunk_number}"  # Unique ID for each chunk, starting from 0
 
                                 new_data = (
                                     chunk_id,  # Primary key
                                     cid,  # Original document ID
-                                    k,  # Chunk number
+                                    chunk_number,  # Chunk number
                                     nature,
                                     etat,
                                     nature_delib,
@@ -487,11 +489,11 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                 data_to_insert.append(new_data)
                             except PermissionDeniedError as e:
                                 logger.error(
-                                    f"PermissionDeniedError (API key issue) for chunk {k} of file {file_path}: {e}"
+                                    f"PermissionDeniedError (API key issue) for chunk {chunk_number} of file {file_path}: {e}"
                                 )
                                 raise
 
-                        # Insérer tous les chunks en une fois
+                        # Insert all chunks at once
                         if data_to_insert:
                             insert_data(data=data_to_insert, table_name=table_name)
 
@@ -537,18 +539,18 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                     chunks = make_chunks(text=texte, chunk_size=1500, chunk_overlap=200)
                     data_to_insert = []
 
-                    for k, chunk_text in enumerate(chunks):
+                    for chunk_number, chunk_text in enumerate(chunks):
                         try:
                             embeddings = generate_embeddings_with_retry(
                                 data=chunk_text, attempts=5, model=model
                             )[0]
 
-                            chunk_id = f"{cid}_{k}"  # Unique ID for each chunk, starting from 0
+                            chunk_id = f"{cid}_{chunk_number}"  # Unique ID for each chunk, starting from 0
 
                             new_data = (
                                 chunk_id,  # Primary key
                                 cid,  # Original document ID
-                                k,  # Chunk number
+                                chunk_number,  # Chunk number
                                 nature,
                                 solution,
                                 titre,
@@ -560,9 +562,352 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                             data_to_insert.append(new_data)
                         except PermissionDeniedError as e:
                             logger.error(
-                                f"PermissionDeniedError (API key issue) for chunk {k} of file {file_path}: {e}"
+                                f"PermissionDeniedError (API key issue) for chunk {chunk_number} of file {file_path}: {e}"
                             )
                             raise
+
+                    # Insert all chunks at once
+                    if data_to_insert:
+                        insert_data(data=data_to_insert, table_name=table_name)
+
+                except Exception as e:
+                    logger.error(f"Error processing file {file_path}: {e}")
+                else:
+                    remove_file(file_path=file_path)  # Remove the file after processing
+
+            if file_name.startswith("JORFDOLE") and file_name.endswith(".xml"):
+                table_name = "dole"
+                file_path = os.path.join(root_dir, file_name)
+                try:
+                    tree = ET.parse(file_path)
+                    root = tree.getroot()
+                    cid = root.find(".//ID").text
+                    title = root.find(".//TITRE").text
+                    number = root.find(".//NUMERO").text
+                    category = root.find(".//TYPE").text
+                    wording = root.find(".//LIBELLE").text  # Libellé
+                    creation_date = datetime.strptime(
+                        root.find(".//DATE_CREATION").text, "%Y-%m-%d"
+                    ).strftime("%d-%m-%Y")
+
+                    exp_memo = root.find(
+                        ".//EXPOSE_MOTIF"
+                    )  # Explanatory Memorandum (Exposé des motifs)
+
+                    if exp_memo:
+                        # Extract all text
+                        content = ET.tostring(exp_memo, method="xml")
+                        content = "".join(ET.fromstring(content).itertext())
+                        exp_memo = dole_cut_exp_memo(
+                            text=content, section="introduction"
+                        )
+                        articles_synthesis_dict = dole_cut_exp_memo(
+                            text=content, section="articles"
+                        )
+                    else:
+                        exp_memo = None
+                        articles_synthesis_dict = []
+
+                    # Creating chunks for explanatory memorandum
+                    chunks = make_chunks(
+                        text=exp_memo, chunk_size=8000, chunk_overlap=400
+                    )
+                    data_to_insert = []
+                    if not chunks:
+                        chunk_text = title
+                        try:
+                            embeddings = generate_embeddings_with_retry(
+                                data=chunk_text, attempts=5, model="BAAI/bge-m3"
+                            )[0]
+                            chunk_number = 0
+                            content_type = "explanatory_memorandum"
+                            chunk_id = f"{cid}_{chunk_number}"
+                            new_data = (
+                                chunk_id,
+                                cid,
+                                chunk_number,
+                                category,
+                                content_type,
+                                title,
+                                number if number else None,
+                                wording,
+                                creation_date,
+                                None,  # article_number
+                                None,  # article_title
+                                None,  # article_synthesis
+                                None,  # article_text
+                                chunk_text,
+                                embeddings,
+                            )
+                            data_to_insert.append(new_data)
+
+                        except PermissionDeniedError as e:
+                            logger.error(
+                                f"PermissionDeniedError (API key issue) for chunk {chunk_number} of file {file_path}: {e}"
+                            )
+                            raise
+                    else:
+                        for chunk_number, chunk in enumerate(chunks):
+                            try:
+                                chunk_text = (title + "\n" + chunk).replace(
+                                    "\n\n", "\n"
+                                )  # Adding the title to the chunk text
+                                embeddings = generate_embeddings_with_retry(
+                                    data=chunk_text, attempts=5, model="BAAI/bge-m3"
+                                )[0]
+                                content_type = "explanatory_memorandum"
+                                chunk_id = f"{cid}_{chunk_number}"
+
+                                new_data = (
+                                    chunk_id,
+                                    cid,
+                                    chunk_number,
+                                    category,
+                                    content_type,
+                                    title,
+                                    number if number else None,
+                                    wording,
+                                    creation_date,
+                                    None,  # article_number
+                                    None,  # article_title
+                                    None,  # article_synthesis
+                                    None,  # article_text
+                                    chunk_text,
+                                    embeddings,
+                                )
+                                data_to_insert.append(new_data)
+
+                            except PermissionDeniedError as e:
+                                logger.error(
+                                    f"PermissionDeniedError (API key issue) for chunk {chunk_number} of file {file_path}: {e}"
+                                )
+                                raise
+
+                    file_content_list = []
+                    for k in range(
+                        1, 6
+                    ):  # There can be up to 5 contenu_dossier sections
+                        contenu_dossier = root.find(f".//CONTENU_DOSSIER_{k}")
+                        if contenu_dossier is not None:
+                            # Extract all text
+                            content = ET.tostring(contenu_dossier, method="xml")
+                            content = "".join(ET.fromstring(content).itertext()).strip()
+
+                            if len(content) > 0:
+                                file_content_list.extend(
+                                    dole_cut_file_content(text=content)
+                                )
+
+                    results = []
+                    if (
+                        len(file_content_list) == 0
+                        and len(articles_synthesis_dict) == 0
+                    ):
+                        results = [
+                            {
+                                "article_number": None,
+                                "article_synthesis": None,
+                                "article_text": None,
+                                "article_title": None,
+                            }
+                        ]
+                    elif (
+                        len(articles_synthesis_dict) > 0 and len(file_content_list) == 0
+                    ):
+                        for article in articles_synthesis_dict:
+                            results.append(
+                                {
+                                    "article_number": article.get(
+                                        "article_number", None
+                                    ),
+                                    "article_synthesis": article.get(
+                                        "article_synthesis", None
+                                    ),
+                                    "article_text": None,
+                                    "article_title": article.get("title_content", None),
+                                }
+                            )
+
+                    elif (
+                        len(articles_synthesis_dict) == 0 and len(file_content_list) > 0
+                    ):
+                        for content in file_content_list:
+                            results.append(
+                                {
+                                    "article_number": content.get(
+                                        "article_number", None
+                                    ),
+                                    "article_synthesis": None,
+                                    "article_text": content.get("article_text", None),
+                                    "article_title": None,
+                                }
+                            )
+
+                    else:
+                        d1 = {
+                            d["article_number"]: d
+                            for d in articles_synthesis_dict
+                            if d["article_number"] is not None
+                        }
+                        d2 = {
+                            d["article_number"]: d
+                            for d in file_content_list
+                            if d["article_number"] is not None
+                        }
+
+                        for num in set(d1) | set(d2):
+                            try:
+                                merged = {
+                                    "article_number": num,
+                                    "article_synthesis": d1.get(num, {})
+                                    .get("article_synthesis", None)
+                                    .strip()
+                                    if d1.get(num, {}).get("article_synthesis")
+                                    else None,
+                                    "article_text": d2.get(num, {})
+                                    .get("article_text", None)
+                                    .strip()
+                                    if d2.get(num, {}).get("article_text")
+                                    else None,
+                                    "article_title": d1.get(num, {})
+                                    .get("title_content", None)
+                                    .strip()
+                                    if d1.get(num, {}).get("title_content")
+                                    else None,
+                                }
+                                results.append(merged)
+                            except Exception as e:
+                                print(
+                                    f"Error merging data for article number {num}: {e}"
+                                )
+
+                        # Adding all articles with None article_number
+                        for d in articles_synthesis_dict:
+                            if d["article_number"] is None:
+                                merged = {
+                                    "article_number": None,
+                                    "article_synthesis": d.get(
+                                        "article_synthesis"
+                                    ).strip()
+                                    if d.get("article_synthesis")
+                                    else None,
+                                    "article_text": None,
+                                    "article_title": d.get("title_content").strip()
+                                    if d.get("title_content")
+                                    else None,
+                                }
+                                results.append(merged)
+
+                        for d in file_content_list:
+                            if d["article_number"] is None:
+                                merged = {
+                                    "article_number": None,
+                                    "article_synthesis": None,
+                                    "article_text": d["article_text"].strip()
+                                    if d.get("article_text")
+                                    else None,
+                                    "article_title": None,
+                                }
+                                results.append(merged)
+
+                    for chunk_number, result in enumerate(results):
+                        chunk_id = f"{cid}_{chunk_number}"  # Unique ID for each chunk, starting from 0
+
+                        if (
+                            result.get("article_number") is not None
+                        ):  # The chunks will be created and chunked by article number
+                            content_type = "article"
+                            chunks = [
+                                str(result.get("article_synthesis", ""))
+                                if result.get("article_synthesis") is not None
+                                else "",
+                            ]
+                            if result.get("article_text"):
+                                article_text = result.get("article_text")
+                                if article_text is not None:
+                                    chunks.append(str(article_text).strip())
+                            chunk_text = "\n".join(chunks).replace("\n\n", "\n").strip()
+                            chunks = make_chunks(
+                                text=chunk_text, chunk_size=8000, chunk_overlap=400
+                            )
+
+                            for chunk_number, chunk in enumerate(chunks):
+                                chunk_text = f"{title}\nArticle {result.get('article_number', '')}:\n{chunk}"
+                                try:
+                                    embeddings = generate_embeddings_with_retry(
+                                        data=chunk_text, attempts=5, model="BAAI/bge-m3"
+                                    )[0]
+
+                                    new_data = (
+                                        chunk_id,
+                                        cid,
+                                        chunk_number,
+                                        category,
+                                        content_type,
+                                        title,
+                                        number if number else None,
+                                        wording,
+                                        creation_date,
+                                        result.get("article_number", None),
+                                        result.get("article_title", None),
+                                        result.get("article_synthesis", None),
+                                        result.get("article_text", None),
+                                        chunk_text,
+                                        embeddings,
+                                    )
+                                    data_to_insert.append(new_data)
+
+                                except PermissionDeniedError as e:
+                                    logger.error(
+                                        f"PermissionDeniedError (API key issue) for chunk {chunk_number} of file {file_path}: {e}"
+                                    )
+                                    raise
+
+                        else:  # The chunks will be created by classic chunking
+                            content_type = "file_content"
+                            chunks = []  # As it is impossible to have an article synthesis without an article number
+
+                            if result.get("article_text", ""):
+                                chunks.append(str(result.get("article_text")).strip())
+                            chunks = "\n".join(chunks).strip()
+
+                            chunks = make_chunks(
+                                text=chunks, chunk_size=8000, chunk_overlap=400
+                            )
+
+                            for i, chunk in enumerate(chunks):
+                                try:
+                                    chunk_text = (title + "\n" + chunk).replace(
+                                        "\n\n", "\n"
+                                    )  # Adding the title to the chunk text
+                                    embeddings = generate_embeddings_with_retry(
+                                        data=chunk_text, attempts=5, model="BAAI/bge-m3"
+                                    )[0]
+
+                                    new_data = (
+                                        chunk_id,
+                                        cid,
+                                        chunk_number,
+                                        category,
+                                        content_type,
+                                        title,
+                                        number if number else None,
+                                        wording,
+                                        creation_date,
+                                        result.get("article_number", None),
+                                        result.get("article_title", None),
+                                        result.get("article_synthesis", None),
+                                        result.get("article_text", None),
+                                        chunk_text,
+                                        embeddings,
+                                    )
+                                    data_to_insert.append(new_data)
+
+                                except PermissionDeniedError as e:
+                                    logger.error(
+                                        f"PermissionDeniedError (API key issue) for chunk {chunk_number} of file {file_path}: {e}"
+                                    )
+                                    raise
 
                     # Insert all chunks at once
                     if data_to_insert:
@@ -849,6 +1194,62 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
                 )
 
                 remove_folder(folder_path=folder_to_remove)
+            else:  # for each folder except the freemium one
+                logger.info(f"Processing folder: {target_dir}")
+
+                process_dila_xml_files(target_dir=target_dir, model=model)
+                logger.info(
+                    f"Folder: {target_dir} successfully processed and data successfully inserted into the postgres database"
+                )
+
+                remove_folder(folder_path=folder_to_remove)
+
+    elif base_folder == DOLE_DATA_FOLDER:
+        try:
+            all_dirs.remove("dole")
+            all_dirs.insert(0, "dole")  # Placing the 'dole' folder at the beginning
+        except ValueError:
+            logger.debug(f"There is no 'dole' directory in {base_folder}")
+
+        for (
+            root_dir
+        ) in all_dirs:  # root_dir is the name of each folder inside the base_folder
+            # Remove obscolete CIDs from the table based on the suppression list file
+            for entity in os.listdir(os.path.join(base_folder, root_dir)):
+                if entity.startswith("liste_suppression"):
+                    try:
+                        cid_to_remove = []
+                        with open(os.path.join(base_folder, root_dir, entity)) as f:
+                            lines = f.readlines()
+                        cid_to_remove = [
+                            line.strip().split("/")[-1]
+                            for line in lines
+                            if line.strip()
+                        ]
+                        logger.info(
+                            f"Removing {len(cid_to_remove)} CIDs from the 'DOLE' table based on {entity}"
+                        )
+                        for cid in cid_to_remove:
+                            remove_data(table_name="dole", column="cid", value=cid)
+                    except Exception as e:
+                        logger.error(f"Error reading {entity}: {e}")
+                        continue
+
+            # Process the XML files in the target directory
+            target_dir = os.path.join(base_folder, root_dir, "dole/global/JORF/DOLE")
+            folder_to_remove = os.path.join(base_folder, root_dir)
+            if root_dir == "dole":
+                # This is the freemium extracted folder
+                target_dir = os.path.join(base_folder, "dole/global/JORF/DOLE")
+                logger.info(f"Processing folder: {target_dir}")
+
+                process_dila_xml_files(target_dir=target_dir, model=model)
+                logger.info(
+                    f"Folder: {target_dir} successfully processed and data successfully inserted into the postgres database"
+                )
+
+                remove_folder(folder_path=folder_to_remove)
+
             else:  # for each folder except the freemium one
                 logger.info(f"Processing folder: {target_dir}")
 

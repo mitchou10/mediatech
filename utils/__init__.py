@@ -5,6 +5,8 @@ from .chunking_and_embedding import (
     make_chunks,
     make_chunks_directories,
     make_chunks_sheets,
+    dole_cut_file_content,
+    dole_cut_exp_memo,
 )
 from .data_helpers import (
     make_schedule,
@@ -18,7 +20,7 @@ from .data_helpers import (
     load_config,
     doc_to_chunk,
     format_model_name,
-    file_md5
+    file_md5,
 )
 
 from .hugging_face import HuggingFace
