@@ -13,12 +13,17 @@ from config import (
     POSTGRES_PASSWORD,
     config_file_path,
 )
-from utils import generate_embeddings, format_model_name
+from utils import (
+    generate_embeddings,
+    format_model_name,
+    format_to_table_name,
+    extract_legi_data,
+)
 
 logger = get_logger(__name__)
 
 
-def create_tables(model="BAAI/bge-m3", delete_existing: bool = False):
+def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
     """
     Creates the necessary tables in the PostgreSQL database as specified in the data configuration file.
     Optionally deletes existing tables before creation.
@@ -251,14 +256,17 @@ def create_tables(model="BAAI/bge-m3", delete_existing: bool = False):
                             cid TEXT NOT NULL,
                             chunk_number INTEGER NOT NULL,
                             nature TEXT,
-                            etat TEXT,
-                            titre TEXT,
-                            titre_complet TEXT,
-                            sous_titres TEXT,
-                            numero TEXT,
-                            date_debut TEXT,
-                            date_fin TEXT,
+                            category TEXT,
+                            ministry TEXT,
+                            status TEXT,
+                            title TEXT,
+                            full_title TEXT,
+                            subtitles TEXT,
+                            number TEXT,
+                            start_date TEXT,
+                            end_date TEXT,
                             nota TEXT,
+                            text TEXT,
                             chunk_text TEXT,
                             "embeddings_{model_name}" vector({embedding_size}),
                             UNIQUE(chunk_id)
@@ -287,6 +295,202 @@ def create_tables(model="BAAI/bge-m3", delete_existing: bool = False):
     finally:
         if conn:
             conn.close()
+
+
+def create_table_from_existing(
+    source_table: str, target_table: str, include_indexes: bool = True
+):
+    """
+    Copy the structure of a PostgreSQL table without its data.
+
+    Args:
+        source_table (str): Name of the source table to copy from
+        target_table (str): Name of the new table to create
+        include_indexes (bool): Whether to include indexes and constraints
+
+    Raises:
+        Logs errors if any exception occurs during database operations.
+    """
+    try:
+        conn = psycopg2.connect(
+            host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
+            dbname=POSTGRES_DB,
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD,
+        )
+        cursor = conn.cursor()
+
+        # Check if source table exists
+        cursor.execute(f"""
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_name = '{source_table.lower()}'
+            );
+        """)
+
+        if not cursor.fetchone()[0]:
+            logger.error(f"Source table '{source_table.upper()}' does not exist")
+            return
+
+        # Check if target table already exists
+        cursor.execute(f"""
+            SELECT EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_name = '{target_table.lower()}'
+            );
+        """)
+
+        if cursor.fetchone()[0]:
+            logger.info(f"Target table '{target_table.upper()}' already exists")
+            return
+
+        if include_indexes:
+            # Copy structure with all constraints and indexes
+            cursor.execute(f"""
+                CREATE TABLE {target_table.upper()} 
+                (LIKE {source_table.upper()} INCLUDING ALL);
+            """)
+        else:
+            # Copy only column structure
+            cursor.execute(f"""
+                CREATE TABLE {target_table.upper()} 
+                (LIKE {source_table.upper()} INCLUDING DEFAULTS INCLUDING CONSTRAINTS);
+            """)
+
+        conn.commit()
+        logger.info(
+            f"Table structure successfully copied from '{source_table.upper()}' to '{target_table.upper()}'"
+        )
+
+    except Exception as e:
+        logger.error(f"Error copying table structure: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+
+def split_table(source_table: str, target_table: str, data_type: str, value: str):
+    """
+    Split data from source table to target table based on specified criteria.
+
+    E.g., insert data from a source table into a target table based on a specific LEGI category or code.
+
+    Args:
+        source_table (str): Name of the source table to query from
+        target_table (str): Name of the target table to insert data into
+        data_type (str): Type of filter to apply ('category' or 'code')
+        value (str): Value to filter by (category name or code title)
+
+    Returns:
+        None: Prints success/error messages to logs
+    """
+    # Connect to PostgreSQL database
+    conn = psycopg2.connect(
+        host=POSTGRES_HOST,
+        port=POSTGRES_PORT,
+        dbname=POSTGRES_DB,
+        user=POSTGRES_USER,
+        password=POSTGRES_PASSWORD,
+    )
+    cursor = conn.cursor()
+
+    if data_type == "category":
+        cursor.execute(f"""
+        SELECT * FROM {source_table} WHERE LOWER(category) = '{value.lower()}'
+        """)
+        rows = cursor.fetchall()
+        if not rows:
+            logger.error(
+                f"No data found for category '{value.upper()}' in table '{source_table.upper()}'"
+            )
+            return
+        else:
+            columns = [f'"{column[0]}"' for column in cursor.description]
+            placeholders = ", ".join(["%s"] * len(columns))
+            insert_query = f"""
+            INSERT INTO {target_table.upper()} ({", ".join(columns)})
+            VALUES ({placeholders})
+            ON CONFLICT (chunk_id) DO UPDATE SET
+            {", ".join([f"{col}=EXCLUDED.{col}" for col in columns if col != '"chunk_id"'])};
+            """
+            cursor.executemany(insert_query, rows)
+            conn.commit()
+            conn.close()
+            logger.info(
+                f"Data inserted into table '{target_table.upper()}' for category '{value.upper()}'"
+            )
+    elif data_type == "code":
+        cursor.execute(f"""
+        SELECT * FROM LEGI WHERE LOWER(category) ='code' AND LOWER(unaccent(full_title)) LIKE LOWER(unaccent('%{value.lower().replace("'", "''")}%'))
+        """)
+        rows = cursor.fetchall()
+        if not rows:
+            logger.error(
+                f"No data found for code '{value.upper()}' in table '{source_table.upper()}'"
+            )
+            return
+        else:
+            columns = [f'"{column[0]}"' for column in cursor.description]
+            placeholders = ", ".join(["%s"] * len(columns))
+            insert_query = f"""
+            INSERT INTO {target_table.upper()} ({", ".join(columns)})
+            VALUES ({placeholders})
+            ON CONFLICT (chunk_id) DO UPDATE SET
+            {", ".join([f"{col}=EXCLUDED.{col}" for col in columns if col != '"chunk_id"'])};
+            """
+            cursor.executemany(insert_query, rows)
+            conn.commit()
+            conn.close()
+            logger.info(
+                f"Data successfully inserted into table '{target_table.upper()}' for code '{value.upper()}'"
+            )
+    else:
+        logger.error(f"Invalid type '{type}' specified.")
+        return
+
+
+def split_legi_table():
+    """
+    Split the main legi table into separate tables based on codes and categories.
+
+    Creates individual tables for each legal code and category, copying structure
+    and data from the source legi table while maintaining indexes.
+    """
+    legi_codes = extract_legi_data(data_type="codes")
+    legi_categories = extract_legi_data(data_type="categories")
+    if "CODE" in legi_categories:
+        legi_categories.remove(
+            "CODE"
+        )  # Remove 'CODE' as it is already handled separately
+
+    for code in legi_codes:
+        create_table_from_existing(
+            source_table="legi",
+            target_table=f"legi_{format_to_table_name(code)}",
+            include_indexes=True,
+        )
+        split_table(
+            source_table="legi",
+            target_table=f"legi_{format_to_table_name(code)}",
+            data_type="code",
+            value=code,
+        )
+
+    for category in legi_categories:
+        create_table_from_existing(
+            source_table="legi",
+            target_table=f"legi_{format_to_table_name(category)}",
+            include_indexes=True,
+        )
+        split_table(
+            source_table="legi",
+            target_table=f"legi_{format_to_table_name(category)}",
+            data_type="category",
+            value=category,
+        )
 
 
 def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
@@ -454,20 +658,23 @@ def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
 
         elif table_name.lower() == "legi":
             insert_query = f"""
-                INSERT INTO LEGI (chunk_id, cid, chunk_number, nature, etat, titre, titre_complet, sous_titres, numero, date_debut, date_fin, nota, chunk_text, "embeddings_{model_name}")
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO LEGI (chunk_id, cid, chunk_number, nature, category, ministry, status, title, full_title, subtitles, number, start_date, end_date, nota, text, chunk_text, "embeddings_{model_name}")
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chunk_id) DO UPDATE SET
                 cid = EXCLUDED.cid,
                 chunk_number = EXCLUDED.chunk_number,
                 nature = EXCLUDED.nature,
-                etat = EXCLUDED.etat,
-                titre = EXCLUDED.titre,
-                titre_complet = EXCLUDED.titre_complet,
-                sous_titres = EXCLUDED.sous_titres,
-                numero = EXCLUDED.numero,
-                date_debut = EXCLUDED.date_debut,
-                date_fin = EXCLUDED.date_fin,
+                category = EXCLUDED.category,
+                ministry = EXCLUDED.ministry,
+                status = EXCLUDED.status,
+                title = EXCLUDED.title,
+                full_title = EXCLUDED.full_title,
+                subtitles = EXCLUDED.subtitles,
+                number = EXCLUDED.number,
+                start_date = EXCLUDED.start_date,
+                end_date = EXCLUDED.end_date,
                 nota = EXCLUDED.nota,
+                text = EXCLUDED.text,
                 chunk_text = EXCLUDED.chunk_text,
                 "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
             """
