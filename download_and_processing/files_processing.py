@@ -25,6 +25,7 @@ from utils import (
     remove_folder,
     remove_file,
     make_schedule,
+    format_subtitles,
 )
 from datetime import datetime
 from openai import PermissionDeniedError
@@ -327,34 +328,42 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                 try:
                     tree = ET.parse(file_path)
                     root = tree.getroot()
-                    etat = root.find(".//ETAT").text
-                    if etat in ["VIGUEUR", "ABROGE_DIFF"]:
+                    status = root.find(".//ETAT").text
+                    if status in ["VIGUEUR", "ABROGE_DIFF"]:
                         cid = root.find(".//ID").text
                         nature = root.find(".//NATURE").text
-                        titre = (
+                        title = (
                             root.find(".//CONTEXTE//TEXTE//TITRE_TXT")
                             .get("c_titre_court")
                             .strip(".")
                         )
-                        sous_titres = []
+                        category = root.find(".//CONTEXTE//TEXTE").get("nature")
+                        ministry = root.find(".//CONTEXTE//TEXTE").get(
+                            "ministere", None
+                        )
+                        subtitles = []
                         for elem in root.find(".//CONTEXTE//TEXTE").iter("TITRE_TM"):
-                            sous_titres.append(elem.text)
-                        sous_titres = " | ".join(sous_titres)
-                        numero = root.find(".//NUM").text
+                            subtitles.append(elem.text)
+                        subtitles = " - ".join(subtitles)
+                        if not subtitles:
+                            subtitles = None
+                        number = root.find(".//NUM").text
 
-                        date_debut = datetime.strptime(
+                        start_date = datetime.strptime(
                             root.find(".//DATE_DEBUT").text, "%Y-%m-%d"
                         ).strftime("%d-%m-%Y")
-                        date_fin = datetime.strptime(
+                        end_date = datetime.strptime(
                             root.find(".//DATE_FIN").text, "%Y-%m-%d"
                         ).strftime("%d-%m-%Y")
-                        titre_complet = root.find(".//TITRE_TXT").text
+                        full_title = root.find(".//TITRE_TXT").text
 
                         nota = []
                         contenu_nota = root.find(".//NOTA//CONTENU")
                         for paragraph in contenu_nota.findall(".//p"):
                             nota.append(paragraph.text)
-                        nota = "\n".join(nota)
+                        nota = "\n".join(nota).strip()
+                        if not nota:
+                            nota = None
 
                         contenu = root.find(".//BLOC_TEXTUEL/CONTENU")
                         texte = []
@@ -377,12 +386,24 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                         texte = "\n".join(texte)
 
                         chunks = make_chunks(
-                            text=texte, chunk_size=1500, chunk_overlap=200
+                            text=texte, chunk_size=5000, chunk_overlap=250
                         )
                         data_to_insert = []
 
-                        for chunk_number, chunk_text in enumerate(chunks):
+                        for chunk_number, text in enumerate(chunks):
                             try:
+                                chunk_text = f"{full_title}"
+                                if number:
+                                    chunk_text += f" - Article {number}"
+                                # Adding subtitles only if the text is long enough
+                                if subtitles and len(text) > 200:
+                                    context = format_subtitles(
+                                        subtitles=subtitles
+                                    )
+                                    if context and len(context) < len(text):
+                                        chunk_text += f"\n{context}"  # Augment the chunk text with subtitles concepts
+                                chunk_text += f"\n{text}"
+
                                 embeddings = generate_embeddings_with_retry(
                                     data=chunk_text, attempts=5, model=model
                                 )[0]
@@ -393,16 +414,19 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                     cid,  # Original document ID
                                     chunk_number,  # Chunk number
                                     nature,
-                                    etat,
-                                    titre,
-                                    titre_complet,
-                                    sous_titres,
-                                    numero,
-                                    date_debut,
-                                    date_fin,
+                                    category,
+                                    ministry,
+                                    status,
+                                    title,
+                                    full_title,
+                                    subtitles,
+                                    number,
+                                    start_date,
+                                    end_date,
                                     nota,
-                                    chunk_text,
-                                    embeddings,
+                                    text,  # Original text
+                                    chunk_text,  # Augmented text for better search
+                                    embeddings,  # Embedding of chunk_text
                                 )
                                 data_to_insert.append(new_data)
                             except PermissionDeniedError as e:

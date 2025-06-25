@@ -8,11 +8,12 @@ services:
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: albert_data
+      POSTGRES_DB: albert_bibliotheque
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./database/sql_scripts/init-unaccent.sql:/docker-entrypoint-initdb.d/init-unaccent.sql:ro
 
 volumes:
   postgres_data:

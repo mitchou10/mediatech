@@ -7,6 +7,7 @@ import tarfile
 import polars as pl
 import psycopg2
 from datetime import datetime
+from unidecode import unidecode
 from .sheets_parser import RagSource
 from config import (
     get_logger,
@@ -102,6 +103,36 @@ def extract_and_remove_tar_files(download_folder: str):
                 logger.info(f"Removed {file_path}")
             except Exception as e:
                 logger.error(f"Error extracting or removing {file_path}: {e}")
+
+
+def format_subtitles(subtitles: str) -> str:
+    """
+    Extract concepts from subtitles by removing prefixes before colons.
+
+    Args:
+        subtitles (str): String containing subtitles separated by " - "
+
+    Returns:
+        str: Extracted concepts joined by " - "
+    """
+    if not subtitles:
+        return ""
+
+    parts = subtitles.split(" - ")
+    concepts = []
+
+    for part in parts:
+        part = part.strip()
+        if ":" in part:
+            concept = part.split(":", 1)[1].strip()
+            if len(concept) > 3:  # Avoid very short concepts
+                concepts.append(concept)
+        else:
+            # Keep only parts that are longer than 3 characters
+            if len(part) > 3:
+                concepts.append(part)
+
+    return " - ".join(concepts)
 
 
 def format_time(time: str) -> str:
@@ -311,6 +342,75 @@ def export_tables_to_parquet(output_folder: str = parquet_files_folder):
     finally:
         if "conn" in locals():
             conn.close()
+
+
+def extract_legi_data(data_type: str) -> list[str]:
+    """
+    Extract distinct data from the 'legi' PostgreSQL table.
+
+    Args:
+        data_type (str): Type of data to extract - 'categories' or 'codes'
+
+    Returns:
+        list[str]: List of distinct categories or code titles, empty list for invalid type
+    """
+
+    # Connect to PostgreSQL database
+    conn = psycopg2.connect(
+        host=POSTGRES_HOST,
+        port=POSTGRES_PORT,
+        dbname=POSTGRES_DB,
+        user=POSTGRES_USER,
+        password=POSTGRES_PASSWORD,
+    )
+    cursor = conn.cursor()
+
+    if data_type == "categories":
+        # Listing all distinct categories in the 'legi' table
+        cursor.execute("""SELECT DISTINCT category FROM legi""")
+        data_list = [row[0] for row in cursor.fetchall()]
+    elif data_type == "codes":
+        # Listing all titles for 'CODE' category in the 'legi' table
+        cursor.execute("""
+            SELECT DISTINCT full_title FROM legi WHERE category = 'CODE'
+        """)
+        data_list = list(
+            set(title[0].split(",")[0].strip() for title in cursor.fetchall())
+        )
+    else:
+        data_list = []
+
+    conn.close()
+    return data_list
+
+
+def format_to_table_name(name: str) -> str:
+    """
+    Convert a string to a valid table name format.
+
+    Removes accents, replaces special characters with underscores,
+    removes parentheses, and converts to lowercase.
+
+    Args:
+        name: The input string to format
+
+    Returns:
+        A formatted string suitable for use as a table name
+    """
+    name = unidecode(name)
+
+    cleaned_title = name
+    for char, replacement in {
+        "'": "_",
+        " ": "_",
+        "`": "_",
+        "(": "",
+        ")": "",
+    }.items():
+        cleaned_title = cleaned_title.replace(char, replacement)
+    formated_name = cleaned_title.lower()
+    return formated_name
+
 
 ### Imported functions from the pyalbert library
 

@@ -76,6 +76,10 @@ Exemples de commandes :
   ```bash
   python main.py process_files --all --model BAAI/bge-m3
   ```
+- Diviser une table en sous tables basés sur differents critères (cf: [`main.py`](main.py)) :
+  ```bash
+  python main.py split_table --source legi
+  ```
 - Exporter les tables PostgreSQL en fichier parquet:  
   ```bash
   python main.py export_tables --output data/parquet

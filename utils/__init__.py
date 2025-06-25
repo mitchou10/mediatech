@@ -16,10 +16,13 @@ from .data_helpers import (
     load_experiences,
     load_sheets,
     extract_and_remove_tar_files,
+    format_subtitles,
+    extract_legi_data,
     load_data_history,
     load_config,
     doc_to_chunk,
     format_model_name,
+    format_to_table_name,
     file_md5,
 )
 
