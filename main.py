@@ -51,6 +51,7 @@ from config import (
     CNIL_DATA_FOLDER,
     LEGI_DATA_FOLDER,
     CONSTIT_DATA_FOLDER,
+    DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER,
     LOCAL_ADMINISTRATIONS_DIRECTORY_FOLDER,
     STATE_ADMINISTRATIONS_DIRECTORY_FOLDER,
     TRAVAIL_EMPLOI_DATA_FOLDER,
@@ -120,6 +121,7 @@ def main():
                     ],
                     "constit": [CONSTIT_DATA_FOLDER],
                     "dole": [DOLE_DATA_FOLDER],
+                    "data_gouv_datasets_catalog": [DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER],
                 }
 
                 if source not in source_map:

@@ -170,7 +170,7 @@ def download_files(config_file_path: str, data_history_path: str):
             logger.info(f"{file_name} successfully downloaded")
 
         elif attributes.get("type") == "sheets":
-            # Downloading the rest of the files (fork of the pyalbert.corpus.download_rag_sources function)
+            # Script based on the pyalbert.corpus.download_rag_sources function)
             storage_dir = attributes.get("download_folder", "")
 
             # create the storage path if it does not exist
@@ -222,5 +222,90 @@ def download_files(config_file_path: str, data_history_path: str):
             logger.info(f"Log config file successfully updated to {data_history_path}")
 
             logger.info(f"Corpus files {file_name} successfuly downloaded")
+        elif attributes.get("type") == "data_gouv":
+            logger.info(f"Downloading '{file_name}'...")
+            url = attributes.get("download_url", "")
+            storage_dir = attributes.get("download_folder", "")
+            try:
+                last_downloaded_file = log.get(file_name).get(
+                    "last_downloaded_file", ""
+                )
+            except Exception as e:
+                last_downloaded_file = ""
+
+            os.makedirs(storage_dir, exist_ok=True)
+
+            if file_name == "data_gouv_datasets_catalog":
+                try:
+                    response = requests.get(url)
+                    resources = response.json().get("resources")
+                    datasets = []
+                    for resource in resources:
+                        if resource.get("title").startswith(
+                            "export-dataset"
+                        ) and resource.get("title").endswith(".csv"):
+                            # Filter out datasets that are not CSV files
+                            datasets.append(
+                                {
+                                    "title": resource.get("title"),
+                                    "url": resource.get("url"),
+                                }
+                            )
+                        else:
+                            continue
+                    if not datasets:
+                        logger.error(
+                            f"No datasets found in {url} that match the criteria."
+                        )
+                        continue
+                    datasets = sorted(datasets, key=lambda x: x["title"].lower())
+                    download_url = datasets[0].get("url")
+                    info = urlopen(download_url).info()
+                    downloaded_file_name = (
+                        info.get_filename()
+                        if info.get_filename()
+                        else os.path.basename(download_url)
+                    )
+                    if last_downloaded_file == file:
+                        logger.info(
+                            f"Last downloaded file is {last_downloaded_file} according to the data history. No new files to download."
+                        )
+                        continue
+                    else:
+                        try:
+                            wget.download(
+                                download_url,
+                                os.path.join(storage_dir, f"{file_name}.csv"),
+                            )
+
+                            logger.info(
+                                f"Successfully downloaded {downloaded_file_name} to {storage_dir} as {file_name}.csv"
+                            )
+
+                            # Update the last download file and date in the log
+                            log[file_name] = {
+                                "last_downloaded_file": downloaded_file_name,
+                                "last_download_date": datetime.now().strftime(
+                                    "%d-%m-%Y %H:%M:%S"
+                                ),
+                            }
+
+                            with open(data_history_path, "w") as file:
+                                json.dump(log, file, indent=4)
+                            logger.info(
+                                f"Log config file successfully updated to {data_history_path}"
+                            )
+
+                        except Exception as e:
+                            logger.error(f"Error downloading files: {e}")
+                except Exception as e:
+                    logger.error(f"Error downloading data_gouv datasets: {e}")
+                    continue
+            else:
+                logger.error(
+                    f"File : {file_name} is not a supported file, skipping download."
+                )
+                continue
+
         else:
-            logger.warning(f"Unknown type {attributes.get('type')} for {file_name}")
+            logger.error(f"Unknown type {attributes.get('type')} for {file_name}")
