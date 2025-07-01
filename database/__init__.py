@@ -3,4 +3,5 @@ from .database_manage import (
     insert_data,
     remove_data,
     split_legi_table,
+    postgres_to_qdrant,
 )

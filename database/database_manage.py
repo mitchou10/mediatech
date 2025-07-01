@@ -4,6 +4,7 @@ from qdrant_client import QdrantClient, models
 import json
 from fastembed import SparseTextEmbedding
 from tqdm import tqdm
+import uuid
 from config import (
     get_logger,
     POSTGRES_DB,
@@ -267,6 +268,52 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
                             end_date TEXT,
                             nota TEXT,
                             text TEXT,
+                            chunk_text TEXT,
+                            "embeddings_{model_name}" vector({embedding_size}),
+                            UNIQUE(chunk_id)
+                        )
+                    """)
+
+                elif table_name.lower() == "data_gouv_datasets_catalog":
+                    cursor.execute(f"""
+                        CREATE TABLE DATA_GOUV_DATASETS_CATALOG (
+                            chunk_id TEXT PRIMARY KEY,
+                            title TEXT,
+                            slug TEXT,
+                            acronym TEXT,
+                            url TEXT,
+                            organization TEXT,
+                            organization_id TEXT,
+                            owner TEXT,
+                            owner_id TEXT,
+                            description TEXT,
+                            frequency TEXT,
+                            license TEXT,
+                            temporal_coverage_start TEXT,
+                            temporal_coverage_end TEXT,
+                            spatial_granularity TEXT,
+                            spatial_zones TEXT,
+                            featured BOOLEAN,
+                            created_at TEXT,
+                            last_modified TEXT,
+                            tags TEXT,
+                            archived TEXT,
+                            resources_count INTEGER,
+                            main_resources_count INTEGER,
+                            resources_formats TEXT,
+                            harvest_backend TEXT,
+                            harvest_domain TEXT,
+                            harvest_created_at TEXT,
+                            harvest_modified_at TEXT,
+                            harvest_remote_url TEXT,
+                            quality_score REAL,
+                            metric_discussions INTEGER,
+                            metric_reuses INTEGER,
+                            metric_reuses_by_months TEXT,
+                            metric_followers INTEGER,
+                            metric_followers_by_months TEXT,
+                            metric_views INTEGER,
+                            metric_resources_downloads REAL,
                             chunk_text TEXT,
                             "embeddings_{model_name}" vector({embedding_size}),
                             UNIQUE(chunk_id)
@@ -678,7 +725,50 @@ def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
                 chunk_text = EXCLUDED.chunk_text,
                 "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
             """
-
+        elif table_name.lower() == "data_gouv_datasets_catalog":
+            insert_query = f"""
+                INSERT INTO DATA_GOUV_DATASETS_CATALOG (chunk_id, title, slug, acronym, url, organization, organization_id, owner, owner_id, description, frequency, license, temporal_coverage_start, temporal_coverage_end, spatial_granularity, spatial_zones, featured, created_at, last_modified, tags, archived, resources_count, main_resources_count, resources_formats, harvest_backend, harvest_domain, harvest_created_at, harvest_modified_at, harvest_remote_url, quality_score, metric_discussions, metric_reuses, metric_reuses_by_months, metric_followers, metric_followers_by_months, metric_views, metric_resources_downloads, chunk_text, "embeddings_{model_name}")
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (chunk_id) DO UPDATE SET
+                title = EXCLUDED.title,
+                slug = EXCLUDED.slug,
+                acronym = EXCLUDED.acronym,
+                url = EXCLUDED.url,
+                organization = EXCLUDED.organization,
+                organization_id = EXCLUDED.organization_id,
+                owner = EXCLUDED.owner,
+                owner_id = EXCLUDED.owner_id,
+                description = EXCLUDED.description,
+                frequency = EXCLUDED.frequency,
+                license = EXCLUDED.license,
+                temporal_coverage_start = EXCLUDED.temporal_coverage_start,
+                temporal_coverage_end = EXCLUDED.temporal_coverage_end,
+                spatial_granularity = EXCLUDED.spatial_granularity,
+                spatial_zones = EXCLUDED.spatial_zones,
+                featured = EXCLUDED.featured,
+                created_at = EXCLUDED.created_at,
+                last_modified = EXCLUDED.last_modified,
+                tags = EXCLUDED.tags,
+                archived = EXCLUDED.archived,
+                resources_count = EXCLUDED.resources_count,
+                main_resources_count = EXCLUDED.main_resources_count,
+                resources_formats = EXCLUDED.resources_formats,
+                harvest_backend = EXCLUDED.harvest_backend,
+                harvest_domain = EXCLUDED.harvest_domain,
+                harvest_created_at = EXCLUDED.harvest_created_at,
+                harvest_modified_at = EXCLUDED.harvest_modified_at,
+                harvest_remote_url = EXCLUDED.harvest_remote_url,
+                quality_score = EXCLUDED.quality_score,
+                metric_discussions = EXCLUDED.metric_discussions,
+                metric_reuses = EXCLUDED.metric_reuses,
+                metric_reuses_by_months = EXCLUDED.metric_reuses_by_months,
+                metric_followers = EXCLUDED.metric_followers,
+                metric_followers_by_months = EXCLUDED.metric_followers_by_months,
+                metric_views = EXCLUDED.metric_views,
+                metric_resources_downloads = EXCLUDED.metric_resources_downloads,
+                chunk_text = EXCLUDED.chunk_text,
+                "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
+            """
         else:
             logger.error(f"Unknown table name: {table_name}")
             conn.commit()
@@ -721,7 +811,7 @@ def postgres_to_qdrant(
         sparse vector embeddings to support hybrid search.
     """
 
-    probe_vector = generate_embeddings(data="Hey, I'am a probe", model=model)
+    probe_vector = generate_embeddings(data="Hey, I'am a probe", model=model)[0]
     embedding_size = len(probe_vector)
     model_name = format_model_name(model)
     bm25_embedding_model = SparseTextEmbedding("Qdrant/bm25")  # For hybrid search
@@ -769,30 +859,134 @@ def postgres_to_qdrant(
                 bm25_embedding_model.passage_embed(row["chunk_text"])
             )
             chunk_id = row["chunk_id"]
-            embeddings = row[f"embeddings_{model_name}"]
+            embeddings = json.loads(row[f"embeddings_{model_name}"])
             metadata = dict(row)
             del (
                 metadata[f"embeddings_{model_name}"],
             )  # Remove unnecessary fields from metadata
 
-        qdrant_client.upsert(
-            collection_name=collection_name,
-            points=[
-                models.PointStruct(
-                    id=chunk_id,
-                    vector={
-                        model: embeddings,
-                        "bm25": bm25_embeddings[0].as_object(),
-                    },
-                    payload=metadata,
-                )
-            ],
-        )
+            # Generate UUID from chunk_id for consistency
+            point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, chunk_id))
+
+            qdrant_client.upsert(
+                collection_name=collection_name,
+                points=[
+                    models.PointStruct(
+                        id=point_id,
+                        vector={
+                            model: embeddings,
+                            "bm25": bm25_embeddings[0].as_object(),
+                        },
+                        payload=metadata,
+                    )
+                ],
+            )
 
         conn.commit()
         conn.close()
     except Exception as e:
         logger.error(f"Error inserting data into Qdrant: {e}")
+
+
+# def postgres_to_qdrant(
+#     table_name: str,
+#     qdrant_client: QdrantClient,
+#     collection_name: str,
+#     delete_existing: bool = False,
+# ):
+#     """
+#     Transfer data from a PostgreSQL table to a Qdrant vector database collection.
+
+#     This function reads data from a specified PostgreSQL table, generates embeddings
+#     for hybrid search using the BM25 model, and stores the data in a Qdrant collection
+#     with vector and sparse vector configurations.
+
+#     Args:
+#         table_name (str): Name of the PostgreSQL table to read data from.
+#         qdrant_client (QdrantClient): Initialized Qdrant client for database operations.
+#         collection_name (str): Name of the Qdrant collection to write data to.
+#         delete_existing (bool, optional): Whether to delete existing collection data.
+#             Defaults to False (though the collection is recreated regardless).
+
+#     Raises:
+#         Exception: Any error encountered during database operations is logged.
+
+#     Note:
+#         The function uses BAAI/bge-m3 for dense vector embeddings and Qdrant/bm25 by default for
+#         sparse vector embeddings to support hybrid search.
+#     """
+
+#     probe_vector = generate_embeddings(data="Hey, I'am a probe", model="BAAI/bge-m3")[0]
+#     embedding_size = len(probe_vector)
+#     bm25_embedding_model = SparseTextEmbedding("Qdrant/bm25")  # For hybrid search
+
+#     if delete_existing:
+#         # Drop the collection if it exists
+#         try:
+#             qdrant_client.delete_collection(collection_name=collection_name)
+#             print(f"Collection '{collection_name}' deleted successfully")
+#         except Exception as e:
+#             print(f"Error deleting collection '{collection_name}': {e}")
+
+#     # Create the Qdrant collection if it doesn't exist
+#     qdrant_client.recreate_collection(
+#         collection_name=collection_name,
+#         vectors_config={
+#             "BAAI/bge-m3": models.VectorParams(
+#                 size=embedding_size, distance=models.Distance.COSINE
+#             )
+#         },
+#         sparse_vectors_config={
+#             "bm25": models.SparseVectorParams(
+#                 modifier=models.Modifier.IDF,
+#             )  # For hybrid search
+#         },
+#     )
+
+#     try:
+#         conn = psycopg2.connect(
+#             host=POSTGRES_HOST,
+#             port=POSTGRES_PORT,
+#             dbname=POSTGRES_DB,
+#             user=POSTGRES_USER,
+#             password=POSTGRES_PASSWORD,
+#         )
+#         cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+#         # Read data from PostgreSQL
+#         cursor.execute(f"SELECT * FROM {table_name.upper()}")
+#         rows = cursor.fetchall()
+
+#         # Prepare data for Qdrant
+#         for row in tqdm(rows, desc="Inserting data into Qdrant", unit="rows"):
+#             bm25_embeddings = list(
+#                 bm25_embedding_model.passage_embed(row["chunk_text"])
+#             )
+#             chunk_id = row["chunk_id"]
+#             embeddings = json.loads(row["embeddings_bge-m3"])
+#             metadata = dict(row)
+#             del (
+#                 metadata["embeddings_bge-m3"],
+#             )  # Remove unnecessary fields from metadata
+
+#             qdrant_client.upsert(
+#                 collection_name=collection_name,
+#                 points=[
+#                     models.PointStruct(
+#                         id=chunk_id,
+#                         vector={
+#                             "BAAI/bge-m3": embeddings,
+#                             "bm25": bm25_embeddings[0].as_object(),
+#                         },
+#                         payload=metadata,
+#                     )
+#                 ],
+#             )
+
+#         conn.commit()
+#         conn.close()
+#     except Exception as e:
+#         print(f"Error inserting data into Qdrant: {e}")
 
 
 def remove_data(table_name: str, column: str, value: str):

@@ -1,5 +1,6 @@
 import os
 import xml.etree.ElementTree as ET
+import pandas as pd
 import json
 from database import insert_data, remove_data
 from config import (
@@ -12,6 +13,7 @@ from config import (
     TRAVAIL_EMPLOI_DATA_FOLDER,
     SERVICE_PUBLIC_PRO_DATA_FOLDER,
     SERVICE_PUBLIC_PART_DATA_FOLDER,
+    DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER,
     DOLE_DATA_FOLDER,
 )
 from utils import (
@@ -32,6 +34,94 @@ from openai import PermissionDeniedError
 from tqdm import tqdm
 
 logger = get_logger(__name__)
+
+
+def process_data_gouv_files(target_dir: str, model: str = "BAAI/bge-m3"):
+    """
+    Process data.gouv.fr files by generating embeddings and storing them in database.
+    The workflow depends on the file.
+
+    Args:
+        target_dir (str): Directory containing the files to process
+        model (str): Model name for embedding generation. Defaults to "BAAI/bge-m3"
+
+    """
+    if target_dir == DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER:
+        table_name = "data_gouv_datasets_catalog"
+        df = pd.read_csv(f"{target_dir}/{table_name}.csv", sep=";", encoding="utf-8")
+
+        df = df[df["description"].str.len() >= 100]  # Filter out rows with short descriptions
+        df["chunk_text"] = (
+            df["title"].astype(str)
+            + "\n"
+            + df["organization"].astype(str)
+            + "\n"
+            + df["description"].astype(str)
+        )
+
+        for _, row in tqdm(
+            df.iterrows(), desc=f"Processing {table_name}", total=len(df)
+        ):
+            # Replace nan values with None in the current row
+            row = row.where(pd.notna(row), None)
+            # Making chunks
+            chunk_text = make_chunks(
+                text=row["chunk_text"], chunk_size=1000, chunk_overlap=100
+            )[
+                0
+            ]  # Only keep the first chunks because a too long description is not interesting for this kind of dataset
+
+            embeddings = generate_embeddings_with_retry(
+                data=chunk_text, attempts=5, model=model
+            )[0]
+            new_data = (
+                row.get("id"),  # Primary key (chunk_id)
+                row.get("title", None),
+                row.get("slug", None),
+                row.get("acronym", None),
+                row.get("url", None),
+                row.get("organization", None),
+                row.get("organization_id", None),
+                row.get("owner", None),
+                row.get("owner_id", None),
+                row.get("description", None),
+                row.get("frequency", None),
+                row.get("license", None),
+                row.get("temporal_coverage.start", None),
+                row.get("temporal_coverage.end", None),
+                row.get("spatial.granularity", None),
+                row.get("spatial.zones", None),
+                row.get("featured", None),
+                row.get("created_at", None),
+                row.get("last_modified", None),
+                row.get("tags", None),  # Convert tags to JSON string
+                row.get("archived", None),
+                row.get("resources_count", None),
+                row.get("main_resources_count", None),
+                row.get("resources_formats", None),
+                row.get("harvest.backend", None),
+                row.get("harvest.domain", None),
+                row.get("harvest.created_at", None),
+                row.get("harvest.modified_at", None),
+                row.get("harvest.remote_url", None),
+                row.get("quality_score", None),
+                row.get("metric.discussions", None),
+                row.get("metric.reuses", None),
+                row.get("metric.reuses_by_months", None),
+                row.get("metric.followers", None),
+                row.get("metric.followers_by_months", None),
+                row.get("metric.views", None),
+                row.get("metric.resources_downloads", None),
+                chunk_text,  # The text chunk for embedding
+                embeddings,  # The embedding vector
+            )
+
+            insert_data(data=[new_data], table_name=table_name)
+    else:
+        logger.error(
+            f"Unknown target directory '{target_dir}' for processing data.gouv.fr files."
+        )
+        return
 
 
 def process_directories(
@@ -397,9 +487,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                     chunk_text += f" - Article {number}"
                                 # Adding subtitles only if the text is long enough
                                 if subtitles and len(text) > 200:
-                                    context = format_subtitles(
-                                        subtitles=subtitles
-                                    )
+                                    context = format_subtitles(subtitles=subtitles)
                                     if context and len(context) < len(text):
                                         chunk_text += f"\n{context}"  # Augment the chunk text with subtitles concepts
                                 chunk_text += f"\n{text}"
@@ -1086,9 +1174,18 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
         )
 
         remove_folder(folder_path=base_folder)
+    elif base_folder == DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER:
+        logger.info(f"Processing files located in : {base_folder}")
 
+        process_data_gouv_files(target_dir=base_folder, model=model)
+
+        logger.info(
+            f"Folder: {base_folder} successfully processed and data successfully inserted into the postgres database"
+        )
+
+        remove_folder(folder_path=base_folder)
     elif base_folder == TRAVAIL_EMPLOI_DATA_FOLDER:
-        logger.info(f"Processing directory files located in : {base_folder}")
+        logger.info(f"Processing files located in : {base_folder}")
 
         make_chunks_sheets(
             storage_dir=base_folder,
@@ -1109,7 +1206,7 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
         SERVICE_PUBLIC_PRO_DATA_FOLDER,
         SERVICE_PUBLIC_PART_DATA_FOLDER,
     ]:
-        logger.info(f"Processing directory files located in : {base_folder}")
+        logger.info(f"Processing files located in : {base_folder}")
 
         make_chunks_sheets(
             storage_dir=base_folder,

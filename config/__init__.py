@@ -7,6 +7,7 @@ from .config import (
     TRAVAIL_EMPLOI_DATA_FOLDER,
     SERVICE_PUBLIC_PRO_DATA_FOLDER,
     SERVICE_PUBLIC_PART_DATA_FOLDER,
+    DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER,
     DOLE_DATA_FOLDER,
     parquet_files_folder,
     config_file_path,

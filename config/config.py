@@ -22,10 +22,12 @@ parquet_files_folder = "data/parquet"
 CNIL_DATA_FOLDER = os.getenv("CNIL_DATA_FOLDER", "data/unprocessed/cnil")
 CONSTIT_DATA_FOLDER = os.getenv("CONSTIT_DATA_FOLDER", "data/unprocessed/constit")
 LOCAL_ADMINISTRATIONS_DIRECTORY_FOLDER = os.getenv(
-    "LOCAL_ADMINISTRATIONS_DIRECTORY_FOLDER", "data/unprocessed/local_administrations_directory"
+    "LOCAL_ADMINISTRATIONS_DIRECTORY_FOLDER",
+    "data/unprocessed/local_administrations_directory",
 )
 STATE_ADMINISTRATIONS_DIRECTORY_FOLDER = os.getenv(
-    "STATE_ADMINISTRATIONS_DIRECTORY_FOLDER", "data/unprocessed/state_administrations_directory"
+    "STATE_ADMINISTRATIONS_DIRECTORY_FOLDER",
+    "data/unprocessed/state_administrations_directory",
 )
 DOLE_DATA_FOLDER = os.getenv("DOLE_DATA_FOLDER", "data/unprocessed/dole")
 LEGI_DATA_FOLDER = os.getenv("LEGI_DATA_FOLDER", "data/unprocessed/legi")
@@ -39,6 +41,10 @@ SERVICE_PUBLIC_PRO_DATA_FOLDER = os.getenv(
 SERVICE_PUBLIC_PART_DATA_FOLDER = os.getenv(
     "SERVICE_PUBLIC_PART_DATA_FOLDER",
     "data/unprocessed/service_public_part",
+)
+DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER = os.getenv(
+    "DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER",
+    "data/unprocessed/data_gouv_datasets_catalog",
 )
 
 # OpenAI API configuration
