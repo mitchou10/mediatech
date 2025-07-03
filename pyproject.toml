@@ -22,7 +22,10 @@ dependencies = [
     "qdrant-client==1.14.2",
     "langchain==0.3.25",
     "lxml==5.4.0",
-    "huggingface-hub==0.32.6"
+    "huggingface-hub==0.32.6",
+    "docopt==0.6.2",
+    "unidecode==1.4.0",
+    "pandas==2.2.3"
 ]
 
 [project.urls]
@@ -33,3 +36,16 @@ Documentation = "https://github.com/etalab-ia/albert-bibliotheque"
 dev = [
     "ruff"
 ]
+
+[project.scripts]
+bibliotheque = "main:main"
+
+[tool.setuptools.packages.find]
+include = ["config*", "database*", "download_and_processing*", "utils*"]
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"

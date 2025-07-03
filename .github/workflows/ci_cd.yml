@@ -1,0 +1,71 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        pip install -e .
+    
+    - name: Validate installation
+      run: |
+        bibliotheque --help  # Vérifier que la commande fonctionne
+        python -c "import config; import database; import download_and_processing; print('All imports are OK')"
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+    - name: Deploy to VM
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          set -e 
+          cd /home/albert/albert-bibliotheque
+          
+          git pull origin main
+          
+          if [ ! -f .env ]; then
+            echo "There is no .env file. Please create it from .env.example."
+            exit 1
+          fi
+          
+          source .venv/bin/activate 2>/dev/null || python -m venv .venv && source .venv/bin/activate
+          pip install -e .
+          
+          if [ -f docker-compose.yml ]; then
+            docker-compose pull
+            docker-compose up -d
+          fi
+          
+          if [ -d scripts ]; then
+            cd scripts/
+            chmod +x *.sh
+          fi
+          echo "Successfully deployed"

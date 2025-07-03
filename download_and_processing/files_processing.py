@@ -234,7 +234,7 @@ def process_directories(
             date_str = data.get("date_modification", "")
             if date_str:
                 modification_date_dt = datetime.strptime(date_str, "%d/%m/%Y %H:%M:%S")
-                modification_date = modification_date_dt.strftime("%d/%m/%Y")
+                modification_date = modification_date_dt.strftime("%Y-%m-%d")
             else:
                 modification_date = ""
         except ValueError:
@@ -441,10 +441,10 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
 
                         start_date = datetime.strptime(
                             root.find(".//DATE_DEBUT").text, "%Y-%m-%d"
-                        ).strftime("%d-%m-%Y")
+                        ).strftime("%Y-%m-%d")
                         end_date = datetime.strptime(
                             root.find(".//DATE_FIN").text, "%Y-%m-%d"
-                        ).strftime("%d-%m-%Y")
+                        ).strftime("%Y-%m-%d")
                         full_title = root.find(".//TITRE_TXT").text
 
                         nota = []
@@ -549,7 +549,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                         numero = root.find(".//NUMERO").text
                         date = datetime.strptime(
                             root.find(".//DATE_TEXTE").text, "%Y-%m-%d"
-                        ).strftime("%d-%m-%Y")
+                        ).strftime("%Y-%m-%d")
 
                         contenu = root.find(".//BLOC_TEXTUEL/CONTENU")
                         texte = []
@@ -628,7 +628,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                     solution = root.find(".//SOLUTION").text
                     date_decision = datetime.strptime(
                         root.find(".//DATE_DEC").text, "%Y-%m-%d"
-                    ).strftime("%d-%m-%Y")
+                    ).strftime("%Y-%m-%d")
                     contenu = root.find(".//BLOC_TEXTUEL//CONTENU")
 
                     texte = []
@@ -700,7 +700,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                     wording = root.find(".//LIBELLE").text  # Libellé
                     creation_date = datetime.strptime(
                         root.find(".//DATE_CREATION").text, "%Y-%m-%d"
-                    ).strftime("%d-%m-%Y")
+                    ).strftime("%Y-%m-%d")
 
                     exp_memo = root.find(
                         ".//EXPOSE_MOTIF"
