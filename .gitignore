@@ -1,7 +1,14 @@
-data/*
-logs/*
+data/
+logs/
+backups/
+*.log
 test/
 .env
 __pycache__/
 config/data_history.json
 test.*
+
+# Build artifacts
+build/
+dist/
+*.egg-info/

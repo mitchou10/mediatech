@@ -1,7 +1,13 @@
 import json
 import os
 from . import load_data_history, file_md5, remove_file
-from config import get_logger, data_history_path
+from config import (
+    get_logger,
+    data_history_path,
+    config_file_path,
+    SERVICE_PUBLIC_PRO_DATA_FOLDER,
+    SERVICE_PUBLIC_PART_DATA_FOLDER,
+)
 import datetime as dt
 from huggingface_hub import (
     HfApi,
@@ -31,6 +37,8 @@ class HuggingFace:
     def is_dataset_up_to_date(self, dataset_name: str, local_file_path: str) -> bool:
         """
         Checks if remote version on Hugging Face is already up to date compared to the local dataset file.
+        This method compares the local dataset file's MD5 hash with the remote file's hash.
+        If the hashes match, it means the local file is up to date with the remote version.
 
         Args:
             dataset_name: Name of the HF dataset to check
@@ -78,7 +86,7 @@ class HuggingFace:
             hf_file_path: Path to the file in HF repository
 
         Returns:
-            Upload date in DDMMYYYY format, or "01012999" if not found
+            Upload date in YYYYMMDD format, or "01012999" if not found
         """
         repo_id = f"{self.hugging_face_repo}/{dataset_name}"
         info = dataset_info(repo_id, token=self.token)
@@ -93,7 +101,7 @@ class HuggingFace:
                         f"Method 1/3 : Renaming the file based on the upload date from Hugging Face LFS metadata: {upload_date}"
                     )
                     return (
-                        upload_date.strftime("%d%m%Y")
+                        upload_date.strftime("%Y%m%d")
                         if hasattr(upload_date, "strftime")
                         else str(upload_date)
                     )
@@ -115,9 +123,9 @@ class HuggingFace:
                                         f"Method 2/3 : Renaming the file based on the last Hugging Face upload date from the data history file : {last_hf_upload_date}"
                                     )
                                     last_hf_upload_date = dt.datetime.strptime(
-                                        last_hf_upload_date, "%d-%m-%Y %H:%M:%S"
+                                        last_hf_upload_date, "%Y-%m-%d %H:%M:%S"
                                     )
-                                    return last_hf_upload_date.strftime("%d%m%Y")
+                                    return last_hf_upload_date.strftime("%Y%m%d")
                                 else:
                                     raise Exception(
                                         f"Last Hugging Face upload date not found in the data history file for the dataset : {dataset_name}"
@@ -138,7 +146,7 @@ class HuggingFace:
                         for commit in commits:
                             if dataset_name in commit.title:
                                 last_commit_date = (
-                                    commit.created_at.strftime("%d%m%Y")
+                                    commit.created_at.strftime("%Y%m%d")
                                     if hasattr(commit.created_at, "strftime")
                                     else str(commit.created_at)
                                 )
@@ -251,7 +259,7 @@ class HuggingFace:
 
             # Update the data history file with the last Hugging Face upload date
             log = load_data_history(data_history_path=data_history_path)
-            date = dt.datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+            date = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             for dataset, attributes in log.items():
                 if dataset.startswith(dataset_name):
                     log[dataset]["last_hf_upload_date"] = date
@@ -263,4 +271,36 @@ class HuggingFace:
             logger.error(
                 f"Error while uploading file {file_path} to the Hugging Face repository {repo_id}: {e}"
             )
+            raise e
+
+    def upload_all_datasets(
+        self, config_file_path: str = config_file_path, private: bool = False
+    ):
+        """
+        Upload all datasets defined in the config file to Hugging Face.
+
+        Args:
+            config_file_path (str): Path to the configuration file containing dataset names and paths.
+        """
+        try:
+            with open(config_file_path, "r") as file:
+                config = json.load(file)
+
+            for dataset_name, attributes in config.items():
+                if attributes.get("download_folder") in [
+                    SERVICE_PUBLIC_PRO_DATA_FOLDER,
+                    SERVICE_PUBLIC_PART_DATA_FOLDER,
+                ]:
+                    dataset_name = "service_public"
+                file_path = f"data/parquet/{dataset_name.lower()}.parquet"
+                if os.path.exists(file_path):
+                    self.upload_dataset(
+                        dataset_name=dataset_name.lower().replace("_", "-"),
+                        file_path=file_path,
+                        private=private,
+                    )
+                else:
+                    logger.warning(f"File {file_path} does not exist. Skipping upload.")
+        except Exception as e:
+            logger.error(f"Error while uploading datasets: {e}")
             raise e

@@ -8,7 +8,7 @@ Usage:
     main.py process_files (--all | --source=<source>) [--folder=<path>] [--model=<model_name>]
     main.py split_table [--source=<source>]
     main.py export_tables [--output=<path>]
-    main.py upload_dataset [--input=<path>] [--dataset-name=<name>] [--private]
+    main.py upload_dataset (--all | --input=<path>) [--dataset-name=<name>] [--private]
     main.py -h | --help
 
 Commands:
@@ -31,6 +31,7 @@ Options:
     --input=<path>          Input path of the dataset to upload
     --dataset-name=<name>   Name of the dataset to upload to Hugging Face
     --output=<path>         Output folder for Parquet files [default: data/parquet]
+    --private               Upload dataset as private on Hugging Face
     -h --help               Show this help message
 
 Examples:
@@ -121,7 +122,9 @@ def main():
                     ],
                     "constit": [CONSTIT_DATA_FOLDER],
                     "dole": [DOLE_DATA_FOLDER],
-                    "data_gouv_datasets_catalog": [DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER],
+                    "data_gouv_datasets_catalog": [
+                        DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER
+                    ],
                 }
 
                 if source not in source_map:
@@ -151,17 +154,25 @@ def main():
         elif args["upload_dataset"]:
             from utils import HuggingFace
 
-            input_path = args["--input"]
-            dataset_name = args["--dataset-name"]
-            private = True if args["--private"] else False
+            if args["--all"]:
+                logger.info("Uploading all datasets to Hugging Face")
+                private = True if args["--private"] else False
+                hf = HuggingFace(hugging_face_repo="FaheemBEG", token=HF_TOKEN)
+                hf.upload_all_datasets(
+                    config_file_path=config_file_path, private=private
+                )
+            else:
+                input_path = args["--input"]
+                dataset_name = args["--dataset-name"]
+                private = True if args["--private"] else False
 
-            logger.info(
-                f"Uploading dataset {dataset_name} from {input_path} to Hugging Face (private={private})"
-            )
-            hf = HuggingFace(hugging_face_repo="AgentPublic", token=HF_TOKEN)
-            hf.upload_dataset(
-                dataset_name=dataset_name, file_path=input_path, private=private
-            )
+                logger.info(
+                    f"Uploading dataset {dataset_name} from {input_path} to Hugging Face (private={private})"
+                )
+                hf = HuggingFace(hugging_face_repo="AgentPublic", token=HF_TOKEN)
+                hf.upload_dataset(
+                    dataset_name=dataset_name, file_path=input_path, private=private
+                )
 
         return 0
 
