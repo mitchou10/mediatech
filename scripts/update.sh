@@ -15,4 +15,3 @@ python main.py create_tables --model BAAI/bge-m3
 python main.py process_files --all --folder data/unprocessed --model BAAI/bge-m3
 python main.py export_tables
 python main.py upload_dataset --all 
-

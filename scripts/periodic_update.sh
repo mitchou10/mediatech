@@ -137,21 +137,3 @@ log "INFO" "========================================="
 log "INFO" "Periodic update completed successfully!"
 log "INFO" "Completed at: $(date '+%Y-%m-%d %H:%M:%S')"
 log "INFO" "========================================="
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
