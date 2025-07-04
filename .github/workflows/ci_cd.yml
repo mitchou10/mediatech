@@ -68,4 +68,10 @@ jobs:
             cd scripts/
             chmod +x *.sh
           fi
+          if [ -f scripts/deployment_packages.sh ]; then
+            ./scripts/deployment_packages.sh
+          else
+            echo "Deployment script not found."
+            exit 1
+          fi
           echo "Successfully deployed"
