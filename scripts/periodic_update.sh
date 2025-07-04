@@ -83,9 +83,9 @@ fi
 # 3. Activating the virtual environment
 log "INFO" "Activating the virtual environment"
 if source "$VENV_DIR/bin/activate"; then
-    log "DEBUG" "✓ Virtual environment activated"
+    log "DEBUG" "Virtual environment activated"
 else
-    log "ERROR" "✗ Failed to activate virtual environment"
+    log "ERROR" "Failed to activate virtual environment"
     exit 1
 fi
 
