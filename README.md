@@ -28,7 +28,7 @@ Il inclut des scripts pour télécharger, traiter, embedder, insérer ces donné
 
 1. Démarrez le conteneur PostgreSQL avec Docker :
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
 2. Vérifiez que le conteneur est en cours d'exécution :

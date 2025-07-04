@@ -91,8 +91,8 @@ jobs:
           cd /home/albert/albert-bibliotheque
           
           if [ -f docker-compose.yml ]; then
-            docker-compose pull
-            docker-compose up -d
+            sudo docker compose pull
+            sudo docker compose up -d
           else
             echo "docker-compose.yml not found."
             exit 1
