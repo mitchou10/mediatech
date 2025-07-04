@@ -2,7 +2,7 @@
 set -e
 
 # SCRIPT_DIR="/home/albert/albert-bibliotheque"
-SCRIPT_DIR="/home/faheem/Etalab/albert-bilbiotheque"
+SCRIPT_DIR="/home/albert/albert-bilbiotheque"
 LOG_FILE="$SCRIPT_DIR/logs/install_or_update_packages.log"
 APT_REQUIREMENTS_FILE="$SCRIPT_DIR/config/requirements-apt.txt"
 # Creating logs directory if it doesn't exist
