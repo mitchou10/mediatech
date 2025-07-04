@@ -39,7 +39,7 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     steps:
-    - name: Deploy to VM
+    - name: Code sync
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.VM_HOST }}
@@ -58,22 +58,42 @@ jobs:
           
           source .venv/bin/activate 2>/dev/null || python3 -m venv .venv && source .venv/bin/activate
           pip install -e .
-          
+
+    - name: System setup
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          set -e 
+          cd /home/albert/albert-bibliotheque
           if [ -d scripts ]; then
             cd scripts/
             chmod +x *.sh
           fi
 
-          if [ -f scripts/deployment_packages.sh ]; then
-            ./scripts/deployment_packages.sh
+          if [ -f deployment_packages.sh ]; then
+            ./deployment_packages.sh
           else
             echo "Deployment script not found."
             exit 1
           fi
-
+    
+    - name: Container deployment
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.VM_HOST }}
+        username: ${{ secrets.VM_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          set -e 
+          cd /home/albert/albert-bibliotheque
+          
           if [ -f docker-compose.yml ]; then
             docker-compose pull
             docker-compose up -d
+          else
+            echo "docker-compose.yml not found."
+            exit 1
           fi
-          
-          echo "Successfully deployed"
