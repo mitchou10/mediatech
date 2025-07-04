@@ -69,8 +69,8 @@ jobs:
           set -e 
           cd /home/albert/albert-bibliotheque
 
-          if [ -f deployment_packages.sh ]; then
-            ./deployment_packages.sh
+          if [ -f scripts/deployment_packages.sh ]; then
+            ./scripts/deployment_packages.sh
           else
             echo "Deployment script not found."
             exit 1
