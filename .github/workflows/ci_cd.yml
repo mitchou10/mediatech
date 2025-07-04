@@ -59,19 +59,21 @@ jobs:
           source .venv/bin/activate 2>/dev/null || python3 -m venv .venv && source .venv/bin/activate
           pip install -e .
           
-          if [ -f docker-compose.yml ]; then
-            docker-compose pull
-            docker-compose up -d
-          fi
-          
           if [ -d scripts ]; then
             cd scripts/
             chmod +x *.sh
           fi
+
           if [ -f scripts/deployment_packages.sh ]; then
             ./scripts/deployment_packages.sh
           else
             echo "Deployment script not found."
             exit 1
           fi
+
+          if [ -f docker-compose.yml ]; then
+            docker-compose pull
+            docker-compose up -d
+          fi
+          
           echo "Successfully deployed"
