@@ -34,7 +34,10 @@ def download_files(config_file_path: str, data_history_path: str):
         if attributes.get("type") == "dila_folder":
             url = attributes.get("download_url", "")
             download_folder = attributes.get("download_folder", "")
-            last_downloaded_file = log.get(file_name).get("last_downloaded_file", "")
+            try:
+                last_downloaded_file = log.get(file_name).get("last_downloaded_file", "")
+            except Exception as e:
+                last_downloaded_file = ""
 
             try:
                 response = requests.get(url)
