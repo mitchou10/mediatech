@@ -68,10 +68,6 @@ jobs:
         script: |
           set -e 
           cd /home/albert/albert-bibliotheque
-          if [ -d scripts ]; then
-            cd scripts/
-            chmod +x *.sh
-          fi
 
           if [ -f deployment_packages.sh ]; then
             ./deployment_packages.sh
