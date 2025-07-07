@@ -1,7 +1,7 @@
 # Executing periodic update
-# Everyday at 8 am
-0 8 * * * /home/albert/albert-bibliotheque/scripts/periodic_update.sh >> /home/albert/albert-bibliotheque/logs/data.log
+# Every Friday at 7 pm
+0 19 * * 5 $PROJECT_DIR/scripts/periodic_update.sh
 
 # Executing periodic backup of the Pgvector (PostgreSQL) volume and some configuration files
 # Every Sunday at 8 am
-0 8 * * 0 /home/albert/albert-bibliotheque/scripts/backup.sh >> /home/albert/albert-bibliotheque/logs/backup.log
+0 8 * * 0 $PROJECT_DIR/scripts/backup.sh

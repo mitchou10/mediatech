@@ -2,6 +2,10 @@ import os
 import xml.etree.ElementTree as ET
 import pandas as pd
 import json
+from datetime import datetime
+from openai import PermissionDeniedError
+from tqdm import tqdm
+
 from database import insert_data, remove_data
 from config import (
     get_logger,
@@ -29,9 +33,7 @@ from utils import (
     make_schedule,
     format_subtitles,
 )
-from datetime import datetime
-from openai import PermissionDeniedError
-from tqdm import tqdm
+
 
 logger = get_logger(__name__)
 
@@ -50,7 +52,9 @@ def process_data_gouv_files(target_dir: str, model: str = "BAAI/bge-m3"):
         table_name = "data_gouv_datasets_catalog"
         df = pd.read_csv(f"{target_dir}/{table_name}.csv", sep=";", encoding="utf-8")
 
-        df = df[df["description"].str.len() >= 100]  # Filter out rows with short descriptions
+        df = df[
+            df["description"].str.len() >= 100
+        ]  # Filter out rows with short descriptions
         df["chunk_text"] = (
             df["title"].astype(str)
             + "\n"
@@ -1144,7 +1148,7 @@ def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int 
         return
 
 
-def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
+def process_data(base_folder: str, model: str = "BAAI/bge-m3"):
     """
     Processes data files located in the specified base folder according to its type.
     Depending on the value of `base_folder`, this function performs several operations.
@@ -1174,6 +1178,7 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
         )
 
         remove_folder(folder_path=base_folder)
+        logger.debug(f"Folder: {base_folder} successfully removed after processing")
     elif base_folder == DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER:
         logger.info(f"Processing files located in : {base_folder}")
 
@@ -1184,6 +1189,7 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
         )
 
         remove_folder(folder_path=base_folder)
+        logger.debug(f"Folder: {base_folder} successfully removed after processing")
     elif base_folder == TRAVAIL_EMPLOI_DATA_FOLDER:
         logger.info(f"Processing files located in : {base_folder}")
 
@@ -1201,6 +1207,7 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
         )
 
         remove_folder(folder_path=base_folder)
+        logger.debug(f"Folder: {base_folder} successfully removed after processing")
 
     elif base_folder in [
         SERVICE_PUBLIC_PRO_DATA_FOLDER,
@@ -1220,7 +1227,8 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
             f"Folder: {base_folder} successfully processed and data successfully inserted into the postgres database"
         )
 
-        # remove_folder(folder_path=base_folder)
+        remove_folder(folder_path=base_folder)
+        logger.debug(f"Folder: {base_folder} successfully removed after processing")
 
     elif base_folder == CNIL_DATA_FOLDER:
         try:
@@ -1264,6 +1272,9 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
                 logger.info(f"Folder: {target_dir} successfully processed")
 
                 remove_folder(folder_path=folder_to_remove)
+                logger.debug(
+                    f"Folder: {folder_to_remove} successfully removed after processing"
+                )
             else:  # for each folder except the freemium one
                 logger.info(f"Processing folder: {target_dir}")
 
@@ -1273,6 +1284,9 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
                 )
 
                 remove_folder(folder_path=folder_to_remove)
+                logger.debug(
+                    f"Folder: {folder_to_remove} successfully removed after processing"
+                )
 
     elif base_folder == CONSTIT_DATA_FOLDER:
         try:
@@ -1318,6 +1332,9 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
                 )
 
                 remove_folder(folder_path=folder_to_remove)
+                logger.debug(
+                    f"Folder: {folder_to_remove} successfully removed after processing"
+                )
             else:  # for each folder except the freemium one
                 logger.info(f"Processing folder: {target_dir}")
 
@@ -1327,6 +1344,9 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
                 )
 
                 remove_folder(folder_path=folder_to_remove)
+                logger.debug(
+                    f"Folder: {folder_to_remove} successfully removed after processing"
+                )
 
     elif base_folder == DOLE_DATA_FOLDER:
         try:
@@ -1373,6 +1393,9 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
                 )
 
                 remove_folder(folder_path=folder_to_remove)
+                logger.debug(
+                    f"Folder: {folder_to_remove} successfully removed after processing"
+                )
 
             else:  # for each folder except the freemium one
                 logger.info(f"Processing folder: {target_dir}")
@@ -1383,6 +1406,9 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
                 )
 
                 remove_folder(folder_path=folder_to_remove)
+                logger.debug(
+                    f"Folder: {folder_to_remove} successfully removed after processing"
+                )
 
     elif base_folder == LEGI_DATA_FOLDER:
         try:
@@ -1433,6 +1459,9 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
                 )
 
                 remove_folder(folder_path=folder_to_remove)
+                logger.debug(
+                    f"Folder: {folder_to_remove} successfully removed after processing"
+                )
 
             else:  # for each folder except the freemium one
                 logger.info(f"Processing folder: {target_dir}")
@@ -1443,9 +1472,12 @@ def get_data(base_folder: str, model: str = "BAAI/bge-m3"):
                 )
 
                 remove_folder(folder_path=folder_to_remove)
+                logger.debug(
+                    f"Folder: {folder_to_remove} successfully removed after processing"
+                )
 
 
-def get_all_data(unprocessed_data_folder: str, model: str = "BAAI/bge-m3"):
+def process_all_data(unprocessed_data_folder: str, model: str = "BAAI/bge-m3"):
     """
     Processes all data directories within the specified unprocessed data folder.
 
@@ -1457,8 +1489,9 @@ def get_all_data(unprocessed_data_folder: str, model: str = "BAAI/bge-m3"):
 
     Note:
         This function iterates over the contents of the given folder, constructs the full path for each subdirectory,
-        and processes the data using the `get_data` function.
+        and processes the data using the `process_data` function.
     """
     for directory in os.listdir(unprocessed_data_folder):
         base_folder = os.path.join(unprocessed_data_folder, directory)
-        get_data(base_folder=base_folder, model=model)
+        process_data(base_folder=base_folder, model=model)
+

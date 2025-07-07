@@ -3,7 +3,8 @@
 """Albert Bibliothèque CLI.
 
 Usage:
-    main.py download_files [--config-file=<path>] [--history-file=<path>]
+    main.py download_all_files [--config-file=<path>] [--history-file=<path>]
+    main.py download_and_process_files (--all | --source=<source>) [--model=<model_name>]
     main.py create_tables [--model=<model_name>] [--delete-existing]
     main.py process_files (--all | --source=<source>) [--folder=<path>] [--model=<model_name>]
     main.py split_table [--source=<source>]
@@ -12,18 +13,19 @@ Usage:
     main.py -h | --help
 
 Commands:
-    download_files          Download files from sources based on configuration file
-    create_tables           Create database tables (with option to delete existing ones)
-    process_files           Process data from specific source or all sources and insert into database
-    split_table             Split a table into multiple smaller tables based on source and criteria
-    export_tables           Export tables to Parquet files
-    upload_dataset          Upload dataset to Hugging Face
+    download_all_files          Download files from sources based on configuration file
+    download_and_process_files  Download and process files from sources based on configuration file
+    create_tables               Create database tables (with option to delete existing ones)
+    process_files               Process data from specific source or all sources and insert into database
+    split_table                 Split a table into multiple smaller tables based on source and criteria
+    export_tables               Export tables to Parquet files
+    upload_dataset              Upload dataset to Hugging Face
 
 Options:
     --config-file=<path>    Path to the config file
     --history-file=<path>   Path to the data history file
     --delete-existing       Delete existing tables before creating new ones
-    --all                   Process all unprocessed data
+    --all                   Process (and download) all unprocessed data
     --model=<model_name>    Embedding model name [default: BAAI/bge-m3]. It is mandatory to specify the same model for all commands.
     --source=<source>       Source to process (service_public, travail_emploi, legi, cnil,
                             state_administrations_directory, local_administrations_directory, constit, dole)
@@ -35,7 +37,9 @@ Options:
     -h --help               Show this help message
 
 Examples:
-    main.py download_files
+    main.py download_all_files
+    main.py download_and_process_files --source service_public --model BAAI/bge-m3
+    main.py download_and_process_files --all --model BAAI/bge-m3
     main.py create_tables --model BAAI/bge-m3 --delete-existing
     main.py process_files --source service_public --model BAAI/bge-m3
     main.py process_files --all --folder data/unprocessed --model BAAI/bge-m3
@@ -65,7 +69,13 @@ from config import (
     data_history_path,
 )
 from database import create_all_tables, split_legi_table
-from download_and_processing import download_files, get_data, get_all_data
+from download_and_processing import (
+    download_all_files,
+    process_data,
+    process_all_data,
+    download_and_process_files,
+    download_and_process_all_files,
+)
 from utils import export_tables_to_parquet
 
 # Setup logging at the start
@@ -77,16 +87,63 @@ def main():
     try:
         args = docopt(__doc__)
 
-        # Download files
-        if args["download_files"]:
+        # # Download files
+        if args["download_all_files"]:
             logger.info(
-                f"Downloading files using config: {config_file_path} and history: {data_history_path}"
+                f"Downloading all files using config: {config_file_path} and history: {data_history_path}"
             )
 
-            download_files(
+            download_all_files(
                 config_file_path=config_file_path,
                 data_history_path=data_history_path,
             )
+
+        elif args["download_and_process_files"]:
+            if args["--all"]:
+                logger.info(
+                    f"Downloading and processing all files using config: {config_file_path} and history: {data_history_path}"
+                )
+                download_and_process_all_files(
+                    config_file_path=config_file_path,
+                    data_history_path=data_history_path,
+                    model=args["--model"] if args["--model"] else "BAAI/bge-m3",
+                )
+            else:
+                source = args["--source"]
+                source_map = {
+                    "service_public": [
+                        "service_public_pro",
+                        "service_public_part",
+                    ],
+                    "travail_emploi": ["travail_emploi"],
+                    "legi": ["legi"],
+                    "cnil": ["cnil"],
+                    "state_administrations_directory": [
+                        "state_administrations_directory"
+                    ],
+                    "local_administrations_directory": [
+                        "local_administrations_directory"
+                    ],
+                    "constit": ["constit"],
+                    "dole": ["dole"],
+                    "data_gouv_datasets_catalog": ["data_gouv_datasets_catalog"],
+                }
+
+                if source not in source_map:
+                    logger.error(f"Unknown source: {source}")
+                    return 1
+                else:
+                    logger.info(
+                        f"Downloading and processing all files using config: {config_file_path} and history: {data_history_path}"
+                    )
+
+                    for data_name in source_map[source]:
+                        download_and_process_files(
+                            data_name=data_name,
+                            config_file_path=config_file_path,
+                            data_history_path=data_history_path,
+                            model=args["--model"] if args["--model"] else "BAAI/bge-m3",
+                        )
 
         # Create tables
         elif args["create_tables"]:
@@ -103,7 +160,7 @@ def main():
             if args["--all"]:
                 folder = args["--folder"]
                 logger.info(f"Processing all unprocessed data from folder: {folder}")
-                get_all_data(unprocessed_data_folder=folder, model=model)
+                process_all_data(unprocessed_data_folder=folder, model=model)
             else:
                 source = args["--source"]
                 source_map = {
@@ -133,7 +190,7 @@ def main():
                 else:
                     logger.info(f"Processing data from source: {source}")
                     for data_folder in source_map[source]:
-                        get_data(base_folder=data_folder, model=model)
+                        process_data(base_folder=data_folder, model=model)
 
         # Split table into smaller tables based on several criteria
         elif args["split_table"]:
@@ -144,6 +201,7 @@ def main():
             else:
                 logger.error(f"Splitting is not implemented for the {source} source.")
                 return 1
+
         # Export tables to parquet
         elif args["export_tables"]:
             output = args["--output"] if args["--output"] else parquet_files_folder
@@ -157,7 +215,7 @@ def main():
             if args["--all"]:
                 logger.info("Uploading all datasets to Hugging Face")
                 private = True if args["--private"] else False
-                hf = HuggingFace(hugging_face_repo="FaheemBEG", token=HF_TOKEN)
+                hf = HuggingFace(hugging_face_repo="AgentPublic", token=HF_TOKEN)
                 hf.upload_all_datasets(
                     config_file_path=config_file_path, private=private
                 )

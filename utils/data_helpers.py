@@ -93,14 +93,14 @@ def extract_and_remove_tar_files(download_folder: str):
         return
     for file_name in os.listdir(download_folder):
         if file_name.endswith(".tar.gz"):
-            logger.info(f"Found {file_name}")
+            logger.debug(f"Found {file_name}")
             file_path = os.path.join(download_folder, file_name)
-            logger.info(f"Extracting {file_path}")
+            logger.debug(f"Extracting {file_path}")
             try:
                 with tarfile.open(file_path, "r:gz") as tar:
                     tar.extractall(path=download_folder)
                 os.remove(file_path)
-                logger.info(f"Removed {file_path}")
+                logger.debug(f"Removed {file_path}")
             except Exception as e:
                 logger.error(f"Error extracting or removing {file_path}: {e}")
 

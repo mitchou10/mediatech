@@ -4,18 +4,17 @@
 # This script handles: git pull, virtual environment, dependencies, execution
 
 # Fix environment for cron
-export HOME=/home/albert
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 set -e  # Stops the script on any error
 
 # Configuration
-SCRIPT_DIR="/home/albert/albert-bibliotheque"
-VENV_DIR="$SCRIPT_DIR/venv"
-LOG_FILE="$SCRIPT_DIR/logs/periodic_update.log"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+VENV_DIR="$PROJECT_DIR/venv"
+LOG_FILE="$PROJECT_DIR/logs/periodic_update.log"
 
 # Creating logs directory if it doesn't exist
-mkdir -p "$SCRIPT_DIR/logs"
+mkdir -p "$PROJECT_DIR/logs"
 
 
 # Defining logging function
@@ -48,8 +47,8 @@ log "INFO" "Date: $(date '+%Y-%m-%d %H:%M:%S')"
 log "INFO" "========================================="
 
 # Going into the project directory
-cd "$SCRIPT_DIR"
-log "DEBUG" "Working directory: $SCRIPT_DIR"
+cd "$PROJECT_DIR"
+log "DEBUG" "Working directory: $PROJECT_DIR"
 
 # 1. Git pull in order to get the latest version
 log "INFO" "========================================="
@@ -118,7 +117,7 @@ log "INFO" "Step 5: Update Script Execution"
 log "INFO" "========================================="
 log "INFO" "Executing the update script..."
 
-if bash scripts/update.sh 2>&1 | tee -a "$LOG_FILE"; then
+if bash scripts/update.sh; then
     log "INFO" "Update script executed successfully"
 else
     log "ERROR" "Failed to execute the update script"

@@ -31,7 +31,7 @@ jobs:
     
     - name: Validate installation
       run: |
-        bibliotheque --help  # Vérifier que la commande fonctionne
+        bibliotheque --help  # Check if the command is available
         python -c "import config; import database; import download_and_processing; print('All imports are OK')"
 
   deploy:
@@ -47,7 +47,15 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           set -e 
-          cd /home/albert/albert-bibliotheque
+
+          PROJECT_DIR="${{ secrets.VM_PROJECT_DIR }}"
+        
+          if [ ! -d "$PROJECT_DIR" ]; then
+            echo "ERROR: Project directory not found: Please check the VM_PROJECT_DIR secret."
+            exit 1
+          fi
+          
+          cd "$PROJECT_DIR"
           
           git pull origin main
           
@@ -67,7 +75,15 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           set -e 
-          cd /home/albert/albert-bibliotheque
+
+          PROJECT_DIR="${{ secrets.VM_PROJECT_DIR }}"
+        
+          if [ ! -d "$PROJECT_DIR" ]; then
+            echo "ERROR: Project directory not found: Please check the VM_PROJECT_DIR secret."
+            exit 1
+          fi
+          
+          cd "$PROJECT_DIR"
 
           if [ -f scripts/deployment_packages.sh ]; then
             ./scripts/deployment_packages.sh
@@ -84,7 +100,15 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           set -e 
-          cd /home/albert/albert-bibliotheque
+
+          PROJECT_DIR="${{ secrets.VM_PROJECT_DIR }}"
+        
+          if [ ! -d "$PROJECT_DIR" ]; then
+            echo "ERROR: Project directory not found: Please check the VM_PROJECT_DIR secret."
+            exit 1
+          fi
+          
+          cd "$PROJECT_DIR"
           
           if [ -f docker-compose.yml ]; then
             sudo docker compose pull

@@ -15,7 +15,6 @@ from huggingface_hub import (
     dataset_info,
     CommitOperationCopy,
     CommitOperationDelete,
-    hf_hub_download,
 )
 
 logger = get_logger(__name__)
