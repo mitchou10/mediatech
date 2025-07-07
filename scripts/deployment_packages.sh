@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-SCRIPT_DIR="/home/albert/albert-bibliotheque"
-LOG_FILE="$SCRIPT_DIR/logs/install_or_update_packages.log"
-APT_REQUIREMENTS_FILE="$SCRIPT_DIR/config/requirements-apt.txt"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LOG_FILE="$PROJECT_DIR/logs/deployment_packages.log"
+APT_REQUIREMENTS_FILE="$PROJECT_DIR/config/requirements-apt.txt"
 # Creating logs directory if it doesn't exist
-mkdir -p "$SCRIPT_DIR/logs"
+mkdir -p "$PROJECT_DIR/logs"
 
 # Defining logging function
 log() {

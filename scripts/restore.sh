@@ -3,16 +3,16 @@
 set -e
 
 # Configuration
-SCRIPT_DIR="/home/albert/albert-bibliotheque"
-PG_BACKUP_DIR="/home/albert/albert-bibliotheque/backups/postgres"
-CONFIG_BACKUP_DIR="/home/albert/albert-bibliotheque/backups/config"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PG_BACKUP_DIR="$PROJECT_DIR/backups/postgres"
+CONFIG_BACKUP_DIR="$PROJECT_DIR/backups/config"
 CONTAINER_NAME="pgvector_container"
 DB_NAME="${POSTGRES_DB}"
 DB_USER="${POSTGRES_USER}"
-LOG_FILE="$SCRIPT_DIR/logs/restore.log"
+LOG_FILE="$PROJECT_DIR/logs/restore.log"
 
 # Creating logs directory if it doesn't exist
-mkdir -p "$SCRIPT_DIR/logs"
+mkdir -p "$PROJECT_DIR/logs"
 
 # Defining logging function
 log() {
@@ -77,9 +77,9 @@ fi
 log "INFO" "========================================="
 
 # Load environment variables
-cd "$SCRIPT_DIR"
+cd "$PROJECT_DIR"
 if [ ! -f .env ]; then
-    log "ERROR" ".env file not found in $SCRIPT_DIR"
+    log "ERROR" ".env file not found in $PROJECT_DIR"
     exit 1
 fi
 

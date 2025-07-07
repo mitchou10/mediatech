@@ -1,20 +1,20 @@
 {
-    "CNIL": {
+    "cnil": {
         "download_url": "https://echanges.dila.gouv.fr/OPENDATA/CNIL/",
         "download_folder": "data/unprocessed/cnil",
         "type": "dila_folder"
     },
-    "CONSTIT": {
+    "constit": {
         "download_url": "https://echanges.dila.gouv.fr/OPENDATA/CONSTIT/",
         "download_folder": "data/unprocessed/constit",
         "type": "dila_folder"
     },
-    "DOLE": {
+    "dole": {
         "download_url": "https://echanges.dila.gouv.fr/OPENDATA/DOLE/",
         "download_folder": "data/unprocessed/dole",
         "type": "dila_folder"
     },
-    "LEGI": {
+    "legi": {
         "download_url": "https://echanges.dila.gouv.fr/OPENDATA/LEGI/",
         "download_folder": "data/unprocessed/legi",
         "type": "dila_folder"

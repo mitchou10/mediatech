@@ -3,18 +3,18 @@
 set -e
 
 # Configuration
-PG_BACKUP_DIR="/home/albert/albert-bibliotheque/backups/postgres"
-CONFIG_BACKUP_DIR="/home/albert/albert-bibliotheque/backups/config"
-SCRIPT_DIR="/home/albert/albert-bibliotheque"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PG_BACKUP_DIR="$PROJECT_DIR/backups/postgres"
+CONFIG_BACKUP_DIR="$PROJECT_DIR/backups/config"
 CONTAINER_NAME="pgvector_container"
 DB_NAME="${POSTGRES_DB}"
 DB_USER="${POSTGRES_USER}"
 RETENTION_DAYS=7
 DATE=$(date +%Y%m%d_%H%M%S)
-LOG_FILE="$SCRIPT_DIR/logs/backup.log"
+LOG_FILE="$PROJECT_DIR/logs/backup.log"
 
 # Creating logs directory if it doesn't exist
-mkdir -p "$SCRIPT_DIR/logs"
+mkdir -p "$PROJECT_DIR/logs"
 
 # Defining logging function
 log() {
@@ -44,7 +44,7 @@ log() {
 mkdir -p "$PG_BACKUP_DIR" "$CONFIG_BACKUP_DIR"
 
 # Load environment variables
-cd /home/albert/albert-bibliotheque
+cd $PROJECT_DIR
 source .env
 
 log "INFO" "========================================="
@@ -75,7 +75,7 @@ log "INFO" "Copying backup from container to host..."
 if docker cp "$CONTAINER_NAME:/tmp/pg_backup_$DATE.dump" "$PG_BACKUP_DIR/"; then
     log "INFO" "Backup successfully copied to $PG_BACKUP_DIR/"
 else
-    log "ERROR" "✗ Failed to copy backup from container"
+    log "ERROR" "Failed to copy backup from container"
     exit 1
 fi
 

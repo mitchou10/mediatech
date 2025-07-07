@@ -1,12 +1,18 @@
 data/
 logs/
 backups/
+venv/*
 *.log
-test/
 .env
 __pycache__/
+
 config/data_history.json
+
 test.*
+test/
+
+
+
 
 # Build artifacts
 build/
