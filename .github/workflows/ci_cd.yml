@@ -111,6 +111,7 @@ jobs:
           cd "$PROJECT_DIR"
           
           if [ -f docker-compose.yml ]; then
+            sudo docker compose down || true
             sudo docker compose pull
             sudo docker compose up -d
           else
