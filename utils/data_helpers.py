@@ -4,8 +4,8 @@ import re
 import json
 import hashlib
 import tarfile
-import polars as pl
 import psycopg2
+import duckdb
 from datetime import datetime
 from unidecode import unidecode
 from .sheets_parser import RagSource
@@ -271,9 +271,7 @@ def remove_file(file_path: str):
         logger.info(f"File {file_path} does not exist")
 
 
-def export_tables_to_parquet(
-    output_folder: str = parquet_files_folder, batch_size: int = 10000
-):
+def export_tables_to_parquet(output_folder: str = parquet_files_folder):
     """
     Exports all tables from the postgresql database to Parquet files by batches.
 
@@ -284,19 +282,19 @@ def export_tables_to_parquet(
         None
     """
     try:
-        conn = psycopg2.connect(
-            host=POSTGRES_HOST,
-            port=POSTGRES_PORT,
-            dbname=POSTGRES_DB,
-            user=POSTGRES_USER,
-            password=POSTGRES_PASSWORD,
-        )
-        cursor = conn.cursor()
+        conn = duckdb.connect()
+        conn.execute("INSTALL postgres")
+        conn.execute("LOAD postgres")
 
-        cursor.execute(
+        conn.execute(f"""
+            ATTACH 'postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}' 
+            AS postgres_db (TYPE postgres)
+        """)
+
+        conn.execute(
             "SELECT table_name FROM information_schema.tables where table_schema='public' AND table_type='BASE TABLE';"
         )
-        tables = cursor.fetchall()
+        tables = conn.fetchall()
         tables = [table[0] for table in tables]
         logger.info(f"Found {len(tables)} tables in the database: {tables}")
         os.makedirs(output_folder, exist_ok=True)
@@ -304,49 +302,32 @@ def export_tables_to_parquet(
         for table_name in tables:
             try:
                 # Get row count from table using SQL COUNT
-                cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-                table_row_count = cursor.fetchone()[0]
+                conn.execute(f"SELECT COUNT(*) FROM postgres_db.{table_name}")
+                table_row_count = conn.fetchone()[0]
 
                 if table_row_count == 0:
                     logger.warning(f"No data found in table '{table_name}'")
                     continue
 
-                cursor.execute(f"SELECT * FROM {table_name} LIMIT 1")
-                columns = [desc[0] for desc in cursor.description]
+                conn.execute(f"SELECT * FROM postgres_db.{table_name} LIMIT 1")
 
                 output_path = f"{output_folder}/{table_name}.parquet"
                 logger.info(
                     f"Exporting {table_row_count} rows from table '{table_name}' to Parquet file: {output_path}"
                 )
 
-                all_dfs = []
+                # Export table to Parquet file
+                conn.execute(
+                    f"COPY (SELECT * FROM postgres_db.{table_name}) TO '{output_path}' (FORMAT PARQUET, COMPRESSION 'LZ4',PARQUET_VERSION 'V1', ROW_GROUP_SIZE 50000)"
+                )
 
-                for offset in range(0, table_row_count, batch_size):
-                    cursor.execute(
-                        f"SELECT * FROM {table_name} LIMIT {batch_size} OFFSET {offset}"
-                    )
-                    batch_rows = cursor.fetchall()
-                    if batch_rows:
-                        df = pl.DataFrame(batch_rows, schema=columns, orient="row")
-                        all_dfs.append(df)
-                    logger.debug(
-                        f"Processed batch {offset // batch_size + 1}/{(table_row_count // batch_size) + 1}"
-                    )
-
-                if all_dfs:
-                    # Concatenate all batches into a single DataFrame
-                    full_df = pl.concat(all_dfs)
-                    full_df.write_parquet(output_path)
-                    
-                    # Log the number of rows in the Parquet file
-                    parquet_row_count = len(full_df)
-                    logger.info(
-                        f"Successfully exported table '{table_name}': {table_row_count} rows → {parquet_row_count} rows"
-                    )
-                else:
-                    logger.warning(
-                        f"No data found in table '{table_name}'. No Parquet file created."
-                    )
+                # Row count in the Parquet file
+                parquet_row_count = conn.execute(
+                    f"SELECT COUNT(*) FROM read_parquet('{output_path}')"
+                ).fetchone()[0]
+                logger.info(
+                    f"Successfully exported table '{table_name}': {table_row_count} rows → {parquet_row_count} rows"
+                )
 
             except Exception as table_error:
                 logger.error(f"Error processing table '{table_name}': {table_error}")

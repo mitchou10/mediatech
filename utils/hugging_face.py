@@ -266,6 +266,11 @@ class HuggingFace:
             with open(data_history_path, "w") as file:
                 json.dump(log, file, indent=4)
             logger.info(f"Log config file successfully updated to {data_history_path}")
+
+            # Remove the local parquet file after upload
+            logger.info(f"Removing local file {file_path} after upload.")
+            remove_file(file_path=file_path)
+
         except Exception as e:
             logger.error(
                 f"Error while uploading file {file_path} to the Hugging Face repository {repo_id}: {e}"

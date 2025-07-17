@@ -176,12 +176,12 @@ def download_and_optionally_process_files(
                     )
 
                     logger.debug(
-                        f"Successfully downloaded {downloaded_file} to {download_folder}"
+                        f"Successfully downloaded {downloaded_file} to {storage_dir}"
                     )
 
                     if process:
                         # Process the downloaded file and remove the folder after processing
-                        process_data(base_folder=download_folder, model=model)
+                        process_data(base_folder=storage_dir, model=model)
 
                         logger.info(
                             f"Successfully downloaded and processed {data_name}"
@@ -305,7 +305,7 @@ def download_and_optionally_process_files(
                         if info.get_filename()
                         else os.path.basename(download_url)
                     )
-                    if last_downloaded_file == file:
+                    if last_downloaded_file == downloaded_file_name:
                         logger.info(
                             f"Last downloaded file is {last_downloaded_file} according to the data history. No new files to download."
                         )
