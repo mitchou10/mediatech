@@ -205,6 +205,7 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
                             full_title TEXT,
                             number TEXT,
                             date TEXT,
+                            text TEXT,
                             chunk_text TEXT,
                             "embeddings_{model_name}" vector({embedding_size}),
                             UNIQUE(chunk_id)
@@ -222,6 +223,7 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
                             title TEXT,
                             number TEXT,
                             decision_date TEXT,
+                            text TEXT,
                             chunk_text TEXT,
                             "embeddings_{model_name}" vector({embedding_size}),
                             UNIQUE(chunk_id)
@@ -652,8 +654,8 @@ def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
             """
         elif table_name.lower() == "cnil":
             insert_query = f"""
-                INSERT INTO CNIL (chunk_id, cid, chunk_number, nature, status, nature_delib, title, full_title, number, date, chunk_text, "embeddings_{model_name}")
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO CNIL (chunk_id, cid, chunk_number, nature, status, nature_delib, title, full_title, number, date, text, chunk_text, "embeddings_{model_name}")
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chunk_id) DO UPDATE SET
                 cid = EXCLUDED.cid,
                 chunk_number = EXCLUDED.chunk_number,
@@ -664,13 +666,14 @@ def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
                 full_title = EXCLUDED.full_title,
                 number = EXCLUDED.number,
                 date = EXCLUDED.date,
+                text = EXCLUDED.text,
                 chunk_text = EXCLUDED.chunk_text,
                 "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
             """
         elif table_name.lower() == "constit":
             insert_query = f"""
-                INSERT INTO CONSTIT (chunk_id, cid, chunk_number, nature, solution, title, number, decision_date, chunk_text, "embeddings_{model_name}")
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO CONSTIT (chunk_id, cid, chunk_number, nature, solution, title, number, decision_date, text, chunk_text, "embeddings_{model_name}")
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chunk_id) DO UPDATE SET
                 cid = EXCLUDED.cid,
                 chunk_number = EXCLUDED.chunk_number,
@@ -679,6 +682,7 @@ def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
                 title = EXCLUDED.title,
                 number = EXCLUDED.number,
                 decision_date = EXCLUDED.decision_date,
+                text = EXCLUDED.text,
                 chunk_text = EXCLUDED.chunk_text,
                 "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
             """
