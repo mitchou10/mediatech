@@ -10,7 +10,7 @@ CONTAINER_NAME="pgvector_container"
 DB_NAME="${POSTGRES_DB}"
 DB_USER="${POSTGRES_USER}"
 RETENTION_DAYS=7 # Number of days to retain logs
-DATE=$(date +%Y%m%d_%H%M%S)
+DATE=$(date +%Y%m%d)
 LOG_FILE="$PROJECT_DIR/logs/backup_$DATE.log"
 
 # Creating logs directory if it doesn't exist

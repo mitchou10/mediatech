@@ -9,7 +9,7 @@ CONFIG_BACKUP_DIR="$PROJECT_DIR/backups/config"
 CONTAINER_NAME="pgvector_container"
 DB_NAME="${POSTGRES_DB}"
 DB_USER="${POSTGRES_USER}"
-DATE=$(date +%Y%m%d_%H%M%S)
+DATE=$(date +%Y%m%d)
 LOG_FILE="$PROJECT_DIR/logs/restore_$DATE.log"
 
 # Creating logs directory if it doesn't exist

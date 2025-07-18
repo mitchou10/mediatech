@@ -3,7 +3,7 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DATE=$(date +%Y%m%d_%H%M%S)
+DATE=$(date +%Y%m%d)
 LOG_FOLDER="$PROJECT_DIR/logs"
 LOG_FILE="$PROJECT_DIR/logs/delete_old_logs_$DATE.log"
 # Number of days to retain logs

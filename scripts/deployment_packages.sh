@@ -2,7 +2,7 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DATE=$(date +%Y%m%d_%H%M%S)
+DATE=$(date +%Y%m%d)
 LOG_FILE="$PROJECT_DIR/logs/deployment_packages_$DATE.log"
 APT_REQUIREMENTS_FILE="$PROJECT_DIR/config/requirements-apt.txt"
 
