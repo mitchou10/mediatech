@@ -7,7 +7,7 @@ def setup_logging(debug=False):
     # Ensure logs directory exists
     os.makedirs("logs", exist_ok=True)
 
-    date = datetime.now().strftime("%Y%m%d_%H%M%S")
+    date = datetime.now().strftime("%Y%m%d")
 
     # Set log level based on debug flag
     log_level = logging.DEBUG if debug else logging.INFO
