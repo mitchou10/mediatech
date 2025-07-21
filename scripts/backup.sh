@@ -4,6 +4,12 @@ set -e
 
 # Configuration
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# Load environment variables
+cd $PROJECT_DIR
+source .env
+
+# Variable definitions
 PG_BACKUP_DIR="$PROJECT_DIR/backups/postgres"
 CONFIG_BACKUP_DIR="$PROJECT_DIR/backups/config"
 CONTAINER_NAME="pgvector_container"
@@ -43,9 +49,6 @@ log() {
 # Create backup directories
 mkdir -p "$PG_BACKUP_DIR" "$CONFIG_BACKUP_DIR"
 
-# Load environment variables
-cd $PROJECT_DIR
-source .env
 
 log "INFO" "========================================="
 log "INFO" "Starting Albert Bibliothèque backup process"

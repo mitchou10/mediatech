@@ -123,7 +123,7 @@ def generate_embeddings(
 
 
 def generate_embeddings_with_retry(
-    data: str | list[str], attempts: int = 5, model: str = "BAAI/bge-m3"
+    data: str | list[str], attempts: int = 5, model: str = "BAAI/bge-m3", time_sleep: int = 60
 ) -> list[float]:
     """
     Generate embeddings for the provided data with retry mechanism.
@@ -147,7 +147,7 @@ def generate_embeddings_with_retry(
         Exception: If embedding generation fails after all retry attempts.
     """
 
-    for attempt in range(attempts):  # Retry embedding up to 5 times
+    for attempt in range(attempts):  # Retry embedding up to {attempts} times
         try:
             embeddings = generate_embeddings(data=data, model=model)
             return embeddings
@@ -157,15 +157,15 @@ def generate_embeddings_with_retry(
             )
             raise
         except Exception as e:
-            if attempt == 4:
+            if attempt == attempts - 1:  # If this is the last attempt
                 logger.error(
                     f"Error generating embeddings for : {data}. Error: {e}. Maximum retries reached ({attempts}). Raising exception."
                 )
                 raise
             logger.error(
-                f"Error generating embeddings for : {data}. Error: {e}. Retrying in 3 seconds (attempt {attempt + 1}/5)"
+                f"Error generating embeddings for : {data}. Error: {e}. Retrying in {time_sleep} seconds (attempt {attempt + 1}/5)"
             )
-            time.sleep(3)  # Waiting 3 seconds before retrying
+            time.sleep(time_sleep)  # Waiting {time_sleep} seconds before retrying
 
 
 def make_chunks(
