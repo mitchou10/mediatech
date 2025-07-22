@@ -760,7 +760,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                 None,  # article_number
                                 None,  # article_title
                                 None,  # article_synthesis
-                                None,  # article_text
+                                None,  # text
                                 chunk_text,
                                 embeddings,
                             )
@@ -772,9 +772,9 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                             )
                             raise
                     else:
-                        for chunk_number, chunk in enumerate(chunks):
+                        for chunk_number, text in enumerate(chunks):
                             try:
-                                chunk_text = (title + "\n" + chunk).replace(
+                                chunk_text = (title + "\n" + text).replace(
                                     "\n\n", "\n"
                                 )  # Adding the title to the chunk text
                                 embeddings = generate_embeddings_with_retry(
@@ -796,7 +796,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                     None,  # article_number
                                     None,  # article_title
                                     None,  # article_synthesis
-                                    None,  # article_text
+                                    text,
                                     chunk_text,
                                     embeddings,
                                 )
@@ -848,7 +848,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                     "article_synthesis": article.get(
                                         "article_synthesis", None
                                     ),
-                                    "article_text": None,
+                                    "article_text": None,  # Because there is no file content
                                     "article_title": article.get("title_content", None),
                                 }
                             )
@@ -862,13 +862,14 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                     "article_number": content.get(
                                         "article_number", None
                                     ),
-                                    "article_synthesis": None,
+                                    "article_synthesis": None,  # Because there is no article synthesis
                                     "article_text": content.get("article_text", None),
-                                    "article_title": None,
+                                    "article_title": None,  # Because there is no article synthesis
                                 }
                             )
 
-                    else:
+                    else:  # Both articles_synthesis_dict and file_content_list are not empty
+                        # Merging articles_synthesis_dict and file_content_list by article_number
                         d1 = {
                             d["article_number"]: d
                             for d in articles_synthesis_dict
@@ -902,11 +903,11 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                 }
                                 results.append(merged)
                             except Exception as e:
-                                print(
+                                logger.error(
                                     f"Error merging data for article number {num}: {e}"
                                 )
 
-                        # Adding all articles with None article_number
+                        # Adding all articles with article_number = None
                         for d in articles_synthesis_dict:
                             if d["article_number"] is None:
                                 merged = {
@@ -935,9 +936,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                 }
                                 results.append(merged)
 
-                    for chunk_number, result in enumerate(results):
-                        chunk_id = f"{cid}_{chunk_number}"  # Unique ID for each chunk, starting from 0
-
+                    for result_number, result in enumerate(results):
                         if (
                             result.get("article_number") is not None
                         ):  # The chunks will be created and chunked by article number
@@ -951,16 +950,25 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                 article_text = result.get("article_text")
                                 if article_text is not None:
                                     chunks.append(str(article_text).strip())
-                            chunk_text = "\n".join(chunks).replace("\n\n", "\n").strip()
+                            chunk_text = (
+                                "\n".join(chunks).replace("\n\n", "\n").strip()
+                            )  # Combining article synthesis and text
                             chunks = make_chunks(
                                 text=chunk_text, chunk_size=8000, chunk_overlap=400
                             )
 
-                            for chunk_number, chunk in enumerate(chunks):
-                                if chunk_number == 0:
-                                    chunk_text = f"{title}\n{chunk}"
+                            for chunk_number, text in enumerate(chunks):
+                                chunk_id = f"{cid}_{chunk_number}"  # Unique ID for each chunk, starting from 0
+
+                                if (
+                                    chunk_number == 0
+                                ):  # Because the first chunk always contains the article number
+                                    chunk_text = f"{title}\n{text}"
                                 else:
-                                    chunk_text = f"{title}\nArticle {result.get('article_number', '')}:\n{chunk}"  # Adding the chunk number to remind which article number the chunk is related to
+                                    if result.get("article_number", ""):
+                                        chunk_text = f"{title}\nArticle {result.get('article_number', '')}:\n{text}"  # Adding the chunk number to remind which article number the chunk is related to
+                                    else:
+                                        chunk_text = f"{title}\n{text}"
                                 try:
                                     embeddings = generate_embeddings_with_retry(
                                         data=chunk_text, attempts=5, model="BAAI/bge-m3"
@@ -979,7 +987,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                         result.get("article_number", None),
                                         result.get("article_title", None),
                                         result.get("article_synthesis", None),
-                                        result.get("article_text", None),
+                                        text,
                                         chunk_text,
                                         embeddings,
                                     )
@@ -992,7 +1000,9 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                     raise
 
                         else:  # The chunks will be created by classic chunking
-                            content_type = "file_content"
+                            chunk_number = result_number
+                            chunk_id = f"{cid}_{chunk_number}"  # Unique ID for each chunk, starting from 0
+                            content_type = "dossier_content"
                             chunks = []  # As it is impossible to have an article synthesis without an article number
 
                             if result.get("article_text", ""):
@@ -1003,9 +1013,9 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                 text=chunks, chunk_size=8000, chunk_overlap=400
                             )
 
-                            for i, chunk in enumerate(chunks):
+                            for i, text in enumerate(chunks):
                                 try:
-                                    chunk_text = (title + "\n" + chunk).replace(
+                                    chunk_text = (title + "\n" + text).replace(
                                         "\n\n", "\n"
                                     )  # Adding the title to the chunk text
                                     embeddings = generate_embeddings_with_retry(
@@ -1025,7 +1035,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                         result.get("article_number", None),
                                         result.get("article_title", None),
                                         result.get("article_synthesis", None),
-                                        result.get("article_text", None),
+                                        text,
                                         chunk_text,
                                         embeddings,
                                     )

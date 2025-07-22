@@ -245,7 +245,7 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
                             article_number INTEGER,
                             article_title TEXT,
                             article_synthesis TEXT,
-                            article_text TEXT,
+                            text TEXT,
                             chunk_text TEXT,
                             "embeddings_{model_name}" vector({embedding_size}),
                             UNIQUE(chunk_id)
@@ -688,7 +688,7 @@ def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
             """
         elif table_name.lower() == "dole":
             insert_query = f"""
-                INSERT INTO DOLE (chunk_id, cid, chunk_number, category, content_type, title, number, wording, creation_date, article_number, article_title, article_synthesis, article_text, chunk_text, "embeddings_{model_name}")
+                INSERT INTO DOLE (chunk_id, cid, chunk_number, category, content_type, title, number, wording, creation_date, article_number, article_title, article_synthesis, text, chunk_text, "embeddings_{model_name}")
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chunk_id) DO UPDATE SET
                 cid = EXCLUDED.cid,
@@ -702,7 +702,7 @@ def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
                 article_number = EXCLUDED.article_number,
                 article_title = EXCLUDED.article_title,
                 article_synthesis = EXCLUDED.article_synthesis,
-                article_text = EXCLUDED.article_text,
+                text = EXCLUDED.text,
                 chunk_text = EXCLUDED.chunk_text,
                 "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
             """

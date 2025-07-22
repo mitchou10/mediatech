@@ -176,7 +176,7 @@ def make_chunks(
     Args:
         text (str): The input text to be split into chunks.
         chunk_size (int, optional): The maximum size of each chunk. Defaults to 512.
-        chunk_overlap (int, optional): The number of overlapping characters between consecutive chunks. Defaults to 100.
+        chunk_overlap (int, optional): The number of overlapping characters between consecutive chunks.
     Returns:
         List[str]: A list of text chunks generated from the input text.
     """
@@ -464,7 +464,7 @@ def dole_cut_exp_memo(text: str, section: str) -> str:
         logger.debug("Empty text provided for cutting.")
         return ""
     article_pattern = re.compile(
-        r"(?:L['’] ?a|(?<!')A|l['’]a)rticle\s+\d{1,2}(?!-)(?:er)?\b"
+        r"(?:L['’] ?a|(?<!')A|l['’]a)rticle\s+\d{1,2}(?!-)(?:er)?$\b"
     )
     title_pattern = re.compile(r"(TITRE\s+\w+)")
 
