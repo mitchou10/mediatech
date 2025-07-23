@@ -13,6 +13,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="$PROJECT_DIR/.venv"
 DATE=$(date +%Y%m%d)
 LOG_FILE="$PROJECT_DIR/logs/periodic_update_$DATE.log"
+LOCK_FILE="$PROJECT_DIR/tmp/periodic_update.lock"
 
 # Creating logs directory if it doesn't exist
 mkdir -p "$PROJECT_DIR/logs"
@@ -50,6 +51,19 @@ log "INFO" "========================================="
 # Going into the project directory
 cd "$PROJECT_DIR"
 log "DEBUG" "Working directory: $PROJECT_DIR"
+
+# Check if another instance is running
+if [ -f "$LOCK_FILE" ]; then
+    log "ERROR" "Another instance of the periodic update script is already running."
+    exit 1
+else
+    touch "$LOCK_FILE"
+    log "DEBUG" "Lock file created: $LOCK_FILE"
+fi
+
+# Remove lock file on exit or interruption
+trap 'rm -f "$LOCK_FILE"' EXIT INT TERM
+
 
 # 1. Git pull in order to get the latest version
 log "INFO" "========================================="
