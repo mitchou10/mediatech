@@ -111,26 +111,46 @@ class HuggingFace:
                         f"Method 1/3 fail : Unable to retrieve the upload date for {hf_file_path} with the LFS datas from Hugging Face: {e}"
                     )
                     try:
+                        # Define a mapping for dataset names to their corresponding file names in the data history file
+                        source_map = {
+                            "service-public": [
+                                "service_public_part",
+                                "service_public_pro",
+                            ],
+                            "travail-emploi": ["travail_emploi"],
+                            "legi": ["legi"],
+                            "cnil": ["cnil"],
+                            "state-administrations-directory": [
+                                "state_administrations_directory"
+                            ],
+                            "local-administrations-directory": [
+                                "local_administrations_directory"
+                            ],
+                            "constit": ["constit"],
+                            "dole": ["dole"],
+                            "data-gouv-datasets-catalog": [
+                                "data_gouv_datasets_catalog"
+                            ],
+                        }
+
                         log = load_data_history(data_history_path=data_history_path)
-                        for file_name, attributes in log.items():
-                            if file_name == dataset_name:
-                                last_hf_upload_date = attributes.get(
-                                    "last_hf_upload_date", ""
-                                )
-                                if last_hf_upload_date:
-                                    logger.info(
-                                        f"Method 2/3 : Renaming the file based on the last Hugging Face upload date from the data history file : {last_hf_upload_date}"
-                                    )
-                                    last_hf_upload_date = dt.datetime.strptime(
-                                        last_hf_upload_date, "%Y-%m-%d %H:%M:%S"
-                                    )
-                                    return last_hf_upload_date.strftime("%Y%m%d")
-                                else:
-                                    raise Exception(
-                                        f"Last Hugging Face upload date not found in the data history file for the dataset : {dataset_name}"
-                                    )
-                            else:
-                                pass
+                        file_name = source_map[dataset_name.lower()][
+                            0
+                        ]  # Get only the first file name from the source map
+                        attributes = log.get(file_name, {})
+                        last_hf_upload_date = attributes.get("last_hf_upload_date", "")
+                        if last_hf_upload_date:
+                            logger.info(
+                                f"Method 2/3 : Renaming the file based on the last Hugging Face upload date from the data history file : {last_hf_upload_date}"
+                            )
+                            last_hf_upload_date = dt.datetime.strptime(
+                                last_hf_upload_date, "%Y-%m-%d %H:%M:%S"
+                            )
+                            return last_hf_upload_date.strftime("%Y%m%d")
+                        else:
+                            raise Exception(
+                                f"Last Hugging Face upload date not found in the data history file for the dataset : {dataset_name}"
+                            )
                         raise Exception(
                             f"Dataset {dataset_name} not found in the data history file."
                         )
@@ -257,15 +277,30 @@ class HuggingFace:
             )
 
             # Update the data history file with the last Hugging Face upload date
+
+            # Define a mapping for dataset names to their corresponding file names in the data history file
+            source_map = {
+                "service-public": ["service_public_part", "service_public_pro"],
+                "travail-emploi": ["travail_emploi"],
+                "legi": ["legi"],
+                "cnil": ["cnil"],
+                "state-administrations-directory": ["state_administrations_directory"],
+                "local-administrations-directory": ["local_administrations_directory"],
+                "constit": ["constit"],
+                "dole": ["dole"],
+                "data-gouv-datasets-catalog": ["data_gouv_datasets_catalog"],
+            }
+
             log = load_data_history(data_history_path=data_history_path)
             date = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            for dataset, attributes in log.items():
-                if dataset.startswith(dataset_name):
-                    log[dataset]["last_hf_upload_date"] = date
+            for file_name in source_map[dataset_name.lower()]:
+                log[file_name]["last_hf_upload_date"] = date
 
             with open(data_history_path, "w") as file:
                 json.dump(log, file, indent=4)
-            logger.info(f"Log config file successfully updated to {data_history_path}")
+            logger.info(
+                f"Log data history file successfully updated to {data_history_path}"
+            )
 
             # Remove the local parquet file after upload
             logger.info(f"Removing local file {file_path} after upload.")

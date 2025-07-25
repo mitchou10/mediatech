@@ -104,8 +104,8 @@ def main():
                 source = args["--source"]
                 source_map = {
                     "service_public": [
-                        "service_public_pro",
                         "service_public_part",
+                        "service_public_pro",
                     ],
                     "travail_emploi": ["travail_emploi"],
                     "legi": ["legi"],
@@ -155,8 +155,8 @@ def main():
                 source = args["--source"]
                 source_map = {
                     "service_public": [
-                        "service_public_pro",
                         "service_public_part",
+                        "service_public_pro",
                     ],
                     "travail_emploi": ["travail_emploi"],
                     "legi": ["legi"],
