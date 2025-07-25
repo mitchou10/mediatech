@@ -13,7 +13,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="$PROJECT_DIR/.venv"
 DATE=$(date +%Y%m%d)
 LOG_FILE="$PROJECT_DIR/logs/periodic_update_$DATE.log"
-LOCK_FILE="$PROJECT_DIR/tmp/periodic_update.lock"
+LOCK_FILE="$PROJECT_DIR/tmp/update.lock"
 
 # Creating logs directory if it doesn't exist
 mkdir -p "$PROJECT_DIR/logs"

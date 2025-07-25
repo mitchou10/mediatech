@@ -46,7 +46,17 @@ jobs:
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          if [ -f /tmp/.deploy.lock ]; then
+          set -e
+          PROJECT_DIR="${{ secrets.VM_PROJECT_DIR }}"
+
+          if [ ! -d "$PROJECT_DIR" ]; then
+            echo "ERROR: Project directory not found: Please check the VM_PROJECT_DIR secret."
+            exit 1
+          fi
+          
+          cd "$PROJECT_DIR"
+
+          if [ -f /tmp/update.lock ]; then
             echo "Deployment is locked. Please wait for the current collections update to finish."
             exit 1
           else
