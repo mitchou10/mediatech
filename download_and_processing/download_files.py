@@ -95,7 +95,6 @@ def download_and_optionally_process_files(
                     ]:  # As we already downloaded the last file, we start from the next file
                         # Ensure the download folder exists
                         os.makedirs(download_folder, exist_ok=True)
-
                         file_url = os.path.join(url, filename)
                         download_path = os.path.join(download_folder, filename)
                         logger.debug(f"Downloading {file_url} to {download_folder}")
@@ -128,11 +127,11 @@ def download_and_optionally_process_files(
                             ),
                         }
 
-                    with open(data_history_path, "w") as file:
-                        json.dump(log, file, indent=4)
-                    logger.info(
-                        f"Log config file successfully updated to {data_history_path}"
-                    )
+                        with open(data_history_path, "w") as file:
+                            json.dump(log, file, indent=4)
+                        logger.info(
+                            f"Log config file successfully updated to {data_history_path}"
+                        )
 
             except Exception as e:
                 logger.error(f"Error downloading files: {e}")
