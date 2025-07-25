@@ -56,7 +56,7 @@ jobs:
           
           cd "$PROJECT_DIR"
 
-          if [ -f /tmp/update.lock ]; then
+          if [ -f tmp/update.lock ]; then
             echo "Deployment is locked. Please wait for the current collections update to finish."
             exit 1
           else
