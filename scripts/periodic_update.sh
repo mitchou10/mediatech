@@ -57,6 +57,7 @@ if [ -f "$LOCK_FILE" ]; then
     log "ERROR" "Another instance of the periodic update script is already running."
     exit 1
 else
+    mkdir -p "$PROJECT_DIR/tmp"
     touch "$LOCK_FILE"
     log "DEBUG" "Lock file created: $LOCK_FILE"
 fi
