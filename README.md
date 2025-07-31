@@ -1,6 +1,6 @@
 # MEDIATECH
 
-[![License](https://img.shields.io/github/license/etalab-ia/mediatech?color=red&label=license)](https://github.com/etalab-ia/mediatech/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/etalab-ia/mediatech?label=licence&color=red)](https://github.com/etalab-ia/mediatech/blob/main/LICENSE)
 [![French version](https://img.shields.io/badge/🇫🇷-French%20version-blue)](./docs/README_fr.md)
 [![Hugging Face collection](https://img.shields.io/badge/🤗-Hugging%20Face%20collection-yellow)](https://huggingface.co/collections/AgentPublic/mediatech-68309e15729011f49ef505e8)
 
