@@ -45,7 +45,7 @@ with DAG(
 
     upload_dataset = BashOperator(
         task_id="upload_dataset",
-        bash_command="mediatech upload_dataset --dataset-name state_administrations_directory",
+        bash_command="mediatech upload_dataset --dataset-name state-administrations-directory",
     )
 
     (
