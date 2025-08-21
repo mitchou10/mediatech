@@ -271,9 +271,7 @@ def remove_file(file_path: str):
         logger.info(f"File {file_path} does not exist")
 
 
-def export_table_to_parquet(
-    table_name: str, output_folder: str = parquet_files_folder
-):
+def export_table_to_parquet(table_name: str, output_folder: str = parquet_files_folder):
     """
     Exports all tables from the postgresql database to Parquet files by batches.
 
@@ -368,10 +366,11 @@ def export_table_to_parquet(
 
             except Exception as table_error:
                 logger.error(f"Error processing table '{table_name}': {table_error}")
-                return
+                raise Exception(f"Error processing table '{table_name}': {table_error}")
 
     except Exception as e:
         logger.error(f"Error connecting to database or exporting tables: {e}")
+        raise Exception(f"Error connecting to database or exporting tables: {e}")
     finally:
         if "conn" in locals():
             conn.close()
