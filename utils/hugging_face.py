@@ -249,6 +249,9 @@ class HuggingFace:
             logger.info(
                 f"The dataset {dataset_name} is already up to date in the Hugging Face repository. No need to upload it again."
             )
+            # Remove the local parquet file
+            logger.info(f"Removing local file {file_path}.")
+            remove_file(file_path=file_path)
             return
 
         # Create the repo if it does not exist
