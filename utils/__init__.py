@@ -23,7 +23,7 @@ from .data_helpers import (
     doc_to_chunk,
     format_model_name,
     format_to_table_name,
-    file_md5,
+    file_sha256,
 )
 
 from .hugging_face import HuggingFace

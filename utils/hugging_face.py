@@ -1,6 +1,8 @@
 import json
 import os
-from . import load_data_history, file_md5, remove_file
+import hashlib
+
+from . import load_data_history, remove_file, file_sha256
 from config import (
     get_logger,
     data_history_path,
@@ -17,6 +19,8 @@ from huggingface_hub import (
     CommitOperationCopy,
     CommitOperationDelete,
 )
+from huggingface_hub.utils import HfHubHTTPError
+
 
 logger = get_logger(__name__)
 
@@ -36,40 +40,67 @@ class HuggingFace:
 
     def is_dataset_up_to_date(self, dataset_name: str, local_file_path: str) -> bool:
         """
-        Checks if remote version on Hugging Face is already up to date compared to the local dataset file.
-        This method compares the local dataset file's MD5 hash with the remote file's hash.
-        If the hashes match, it means the local file is up to date with the remote version.
+        Checks if the remote file on Hugging Face is identical to the local file
+        by comparing their SHA256 hashes without downloading the remote file.
 
         Args:
-            dataset_name: Name of the HF dataset to check
-            file_path: Local dataset file path to compare
+            dataset_name: Name of the HF dataset to check.
+            local_file_path: Local dataset file path to compare.
 
         Returns:
-            bool: True if local file matches remote file, False otherwise
+            bool: True if local file hash matches the remote file hash, False otherwise.
         """
         repo_id = f"{self.hugging_face_repo}/{dataset_name}"
         path_in_repo = f"data/{dataset_name}-latest.parquet"
+
         try:
-            # Download the remote file
-            hf_local_path = self.api.hf_hub_download(
-                repo_id=repo_id,
-                repo_type="dataset",
-                filename=path_in_repo,
-                token=self.token,
+            # Get the repository metadata from the Hub API
+            info = self.api.dataset_info(
+                repo_id=repo_id, files_metadata=True, token=self.token
             )
-            remote_hash = file_md5(hf_local_path)
-            local_hash = file_md5(local_file_path)
+
+            # Find the specific file in the list of siblings (all files in the repo)
+            remote_file_info = next(
+                (f for f in info.siblings if f.rfilename == path_in_repo), None
+            )
+            if not remote_file_info:
+                logger.warning(
+                    f"File '{path_in_repo}' not found in remote repo '{repo_id}'. Assuming not up to date."
+                )
+                return False
+
+            # Get the SHA256 hash from the LFS metadata
+            remote_hash = (
+                remote_file_info.lfs.get("sha256") if remote_file_info.lfs else None
+            )
+            if not remote_hash:
+                logger.error(
+                    f"Could not retrieve LFS hash for remote file '{path_in_repo}'."
+                )
+                return False
+
+            # Calculate the SHA256 hash of the local file
+            local_hash = file_sha256(local_file_path)
             logger.info(
-                f"Comparing local file hash {local_hash} with remote file hash {remote_hash}"
+                f"Comparing local SHA256 ({local_hash}) with remote SHA256 ({remote_hash})"
             )
 
-            # Remove the downloaded file
-            remove_file(file_path=hf_local_path)
-
+            # Compare the hashes
             return local_hash == remote_hash
+
+        except HfHubHTTPError as e:
+            # If the repo or file does not exist (404), it's not up to date.
+            if e.response.status_code == 404:
+                logger.info(
+                    f"Dataset '{repo_id}' or file does not exist. Assuming not up to date."
+                )
+            else:
+                logger.error(f"HTTP Error checking dataset status for '{repo_id}': {e}")
+            return False
         except Exception as e:
-            logger.error(f"Error checking if dataset {dataset_name} is up to date: {e}")
-            # If the dataset does not exist or any other error occurs, we assume it's not up to date
+            logger.error(
+                f"An unexpected error occurred while checking dataset '{repo_id}': {e}"
+            )
             return False
 
     def get_file_upload_date(self, dataset_name: str, hf_file_path: str) -> str:

@@ -159,21 +159,13 @@ def format_model_name(model_name: str) -> str:
     return model_name.partition("/")[2]
 
 
-def file_md5(path) -> str:
-    """
-    Calculate the MD5 hash of a file.
-
-    Args:
-        path (str): The file path to calculate the MD5 hash for.
-
-    Returns:
-        str: The hexadecimal representation of the MD5 hash.
-    """
-    hash_md5 = hashlib.md5()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
+def file_sha256(file_path: str) -> str:
+    """Computes the SHA256 hash of a file."""
+    h = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        while chunk := f.read(8192):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def make_schedule(plages: list) -> str:
