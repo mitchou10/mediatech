@@ -15,7 +15,6 @@ CONFIG_BACKUP_DIR="$PROJECT_DIR/backups/config"
 CONTAINER_NAME="pgvector_container"
 DB_NAME="${POSTGRES_DB}"
 DB_USER="${POSTGRES_USER}"
-RETENTION_DAYS=7 # Number of days to retain logs
 DATE=$(date +%Y%m%d)
 LOG_FILE="$PROJECT_DIR/logs/backup_$DATE.log"
 
@@ -106,16 +105,9 @@ log "INFO" "Step 3: Final Compression"
 log "INFO" "========================================="
 gzip "$PG_BACKUP_DIR/pg_backup_$DATE.dump"
 
-# 4. Clean up old backups
+# 4. Final report
 log "INFO" "========================================="
-log "INFO" "Step 4: Cleanup Old Backups"
-log "INFO" "========================================="
-find "$PG_BACKUP_DIR" -name "pg_backup_*.dump.gz" -mtime +$RETENTION_DAYS -delete
-find "$CONFIG_BACKUP_DIR" -name "config_backup_*.tar.gz" -mtime +$RETENTION_DAYS -delete
-
-# 5. Final report
-log "INFO" "========================================="
-log "INFO" "Step 5: Final Report"
+log "INFO" "Step 4: Final Report"
 log "INFO" "========================================="
 log "INFO" "Backup completed:"
 log "  DB: $PG_BACKUP_DIR/pg_backup_$DATE.dump.gz ($(du -h "$PG_BACKUP_DIR/pg_backup_$DATE.dump.gz" | cut -f1))"

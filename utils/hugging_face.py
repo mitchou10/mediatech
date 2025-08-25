@@ -1,6 +1,5 @@
 import json
 import os
-import hashlib
 
 from . import load_data_history, remove_file, file_sha256
 from config import (

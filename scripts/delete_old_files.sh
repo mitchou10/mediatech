@@ -8,16 +8,18 @@ DATE=$(date +%Y%m%d)
 LOG_FOLDER="$PROJECT_DIR/logs"
 mkdir -p "$LOG_FOLDER"
 
-AIRFLOW_LOG_FOLDER="$PROJECT_DIR/airflow/logs"
+if [ "$RUNNING_IN_DOCKER" = "true" ]; then
+    AIRFLOW_LOG_FOLDER="/opt/airflow/logs"
+else
+    AIRFLOW_LOG_FOLDER="$PROJECT_DIR/airflow/logs"
+fi
+
 PG_BACKUP_FOLDER="$PROJECT_DIR/backups/postgres"
 CONFIG_BACKUP_FOLDER="$PROJECT_DIR/backups/config"
 LOG_FILE="$PROJECT_DIR/logs/delete_old_files_$DATE.log"
 
 # Load environment variables from .env file
 export $(grep -v '^#' .env | xargs)
-
-# Number of days to retain logs
-RETENTION_DAYS=${RETENTION_DAYS:-7}
 
 # Defining logging function
 log() {
@@ -49,7 +51,7 @@ if [ -d "$LOG_FOLDER" ]; then
 	find "$LOG_FOLDER" -name "*.log" -mtime +$RETENTION_DAYS -delete
 	log "INFO" "Old log files older than $RETENTION_DAYS days have been deleted from $LOG_FOLDER."
 else
-	log "ERROR" "Log folder $LOG_FOLDER does not exist." 
+	log "WARNING" "Log folder $LOG_FOLDER does not exist." 
     # Note : It will not write anything to the log file as the log folder does not exist
 fi
 
@@ -59,21 +61,19 @@ if [ -d "$AIRFLOW_LOG_FOLDER" ]; then
     find "$AIRFLOW_LOG_FOLDER" -type d -empty -delete
     log "INFO" "Old Airflow log files older than $RETENTION_DAYS days have been deleted from $AIRFLOW_LOG_FOLDER."
 else
-    log "ERROR" "Airflow log folder $AIRFLOW_LOG_FOLDER does not exist." 
-    # Note : It will not write anything to the log file as the log folder does not exist
+    log "WARNING" "Airflow log folder $AIRFLOW_LOG_FOLDER does not exist." 
 fi
 
 if [ -d "$PG_BACKUP_FOLDER" ]; then
     find "$PG_BACKUP_FOLDER" -type f -mtime +$RETENTION_DAYS -delete
     log "INFO" "Old PostgreSQL backup files older than $RETENTION_DAYS days have been deleted from $PG_BACKUP_FOLDER."
 else
-    log "ERROR" "PostgreSQL backup folder $PG_BACKUP_FOLDER does not exist."
+    log "WARNING" "PostgreSQL backup folder $PG_BACKUP_FOLDER does not exist."
 fi
 
 if [ -d "$CONFIG_BACKUP_FOLDER" ]; then
 	find "$CONFIG_BACKUP_FOLDER" -type f -mtime +$RETENTION_DAYS -delete
 	log "INFO" "Old configuration backup files older than $RETENTION_DAYS days have been deleted from $CONFIG_BACKUP_FOLDER."
 else
-	log "ERROR" "Configuration backup folder $CONFIG_BACKUP_FOLDER does not exist." 
-    # Note : It will not write anything to the log file as the log folder does not exist
+	log "WARNING" "Configuration backup folder $CONFIG_BACKUP_FOLDER does not exist." 
 fi

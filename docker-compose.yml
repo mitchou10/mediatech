@@ -29,6 +29,7 @@ x-airflow-common:
     - ./data:/tmp/mediatech/data
     - ./logs:/tmp/mediatech/logs
     - ./tmp:/tmp/mediatech/tmp
+    - ./backups:/tmp/mediatech/backups
   user: "${AIRFLOW_UID:-50000}:0"
   extra_hosts:
     - "host.docker.internal:host-gateway"
