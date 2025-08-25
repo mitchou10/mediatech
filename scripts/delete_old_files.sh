@@ -13,8 +13,11 @@ PG_BACKUP_FOLDER="$PROJECT_DIR/backups/postgres"
 CONFIG_BACKUP_FOLDER="$PROJECT_DIR/backups/config"
 LOG_FILE="$PROJECT_DIR/logs/delete_old_files_$DATE.log"
 
+# Load environment variables from .env file
+export $(grep -v '^#' .env | xargs)
+
 # Number of days to retain logs
-RETENTION_DAYS=9
+RETENTION_DAYS=${RETENTION_DAYS:-7}
 
 # Defining logging function
 log() {
