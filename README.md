@@ -58,10 +58,39 @@ It includes scripts for downloading, processing, embedding, and inserting this d
 
 5. Define the `JWT_TOKEN` variable in the [`.env`](.env) file with the obtained `access_token`.
 
+#### Optional : Configure Tchap logging 
+
+To receive real-time notifications about DAG execution (start, success, failure) in a Tchap room, you need to configure an Apprise connection in Airflow.
+> If you don't want to, you can just remove the following lines in each DAG located in [`airflow_config/dags/`](airflow_config/dags/) :
+
+      on_execute_callback=get_start_notifier(),
+      on_success_callback=get_success_notifier(),
+      on_failure_callback=get_failure_notifier(),
+
+Otherwise : 
+
+1.  Navigate to the Airflow UI (usually `http://localhost:8080`).
+2.  Go to **Admin > Connections**.
+3.  Click the **`+`** icon to add a new record.
+4.  Fill in the connection form with the following details:
+    *   **Connection Id**: `TchapNotifier`
+    *   **Connection Type**: `Apprise`
+    *   **Extra fields > config**: Construct the Apprise URL for Matrix using your environment variables, following this format:
+        ```
+        {"path": "matrixs://<TCHAP_ACCOUNT_TOKEN>@<TCHAP_SERVER>/<TCHAP_ROOM_TOKEN>/?format=markdown", "tag": "alerts"}
+        ```
+        -   Replace `<TCHAP_ACCOUNT_TOKEN>` with the value from your `.env` file.
+        -   Replace `<TCHAP_SERVER>` with the server hostname from your `.env` file (e.g., `matrix.agent.dinum.tchap.gouv.fr`, **without** the `https://` prefix).
+        -   Replace `<TCHAP_ROOM_TOKEN>` with the room ID from your `.env` file.
+
+5.  Click **Save**.
+
+Airflow will now use this connection to send formatted notifications to your specified Tchap room.
+
 #### Downloading, Processing and Uploading Data
 
 You are now ready to use Airflow and execute DAGs that are available.
-Each dataset has its own DAG and a [`DAG_Controller`](./airflow/dags/dag_controller.py) is defined to manage all datasets DAGs and their execution order.
+Each dataset has its own DAG and a [`DAG_Controller`](./airflow_config/dags/dag_controller.py) is defined to manage all datasets DAGs and their execution order.
 
 ### </> Method 2 : Use local CLI
 
@@ -215,8 +244,9 @@ This script will:
   - **[`scripts/initial_deployment.sh`](scripts/initial_deployment.sh)**: Sets up a new server environment by installing Docker, Docker Compose, and other system dependencies.
   - **[`scripts/containers_deployment.sh`](scripts/containers_deployment.sh)**:  Manages the application's lifecycle by building, initializing, and deploying the Docker containers as defined in [docker-compose.yml](docker-compose.yml). It must be executed after each update of the Mediatech CLI or other script not shared with the Airflow container, as defined in [docker-compose.yml](docker-compose.yml).
   - **[`scripts/check_running_dags.sh`](scripts/check_running_dags.sh)**: Checks the Airflow API to see if any data pipelines (DAGs) are currently running, used to safely lock the deployment process.
-  - **[`scripts/delete_old_files.sh`](scripts/delete_old_files.sh)**: Shell script to automatically delete old files  from severals folders such as [logs/](logs/), [airflow/logs](airflow/logs) and [backups/](backups/). It keeps files from the last X days and deletes older ones. This script can be run manually or scheduled via cron to keep the folders clean.
-- **[`airflow`](airflow/)**: Contains all files related to Apache Airflow, including DAG definitions (`dags/`), configuration (`config/`), logs (`logs/`), and plugins (`plugins/`). This is where the data orchestration pipelines are defined and managed.
+  - **[`scripts/delete_old_files.sh`](scripts/delete_old_files.sh)**: Shell script to automatically delete old files  from severals folders such as [logs/](logs/), [airflow_config/logs](airflow_config/logs) and [backups/](backups/). It keeps files from the last X days and deletes older ones. This script can be run manually or scheduled via cron to keep the folders clean.
+  - **[`scripts/write_tchap_message.sh`](scripts/write_tchap_message.sh)**: Sends a formatted message to a specified Tchap room. It takes the message content as an argument and uses environment variables for authentication and destination.
+- **[`airflow_config`](airflow_config/)**: Contains all files related to Apache Airflow, including DAG definitions (`dags/`), configuration (`config/`), logs (`logs/`), and plugins (`plugins/`). This is where the data orchestration pipelines are defined and managed.
 
 ## ⚖️ License
 

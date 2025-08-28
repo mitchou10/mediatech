@@ -80,7 +80,7 @@ class HuggingFace:
 
             # Calculate the SHA256 hash of the local file
             local_hash = file_sha256(local_file_path)
-            logger.info(
+            logger.debug(
                 f"Comparing local SHA256 ({local_hash}) with remote SHA256 ({remote_hash})"
             )
 
@@ -280,7 +280,7 @@ class HuggingFace:
                 f"The dataset {dataset_name} is already up to date in the Hugging Face repository. No need to upload it again."
             )
             # Remove the local parquet file
-            logger.info(f"Removing local file {file_path}.")
+            logger.debug(f"Removing local file {file_path}.")
             remove_file(file_path=file_path)
             return
 
@@ -337,7 +337,7 @@ class HuggingFace:
             )
 
             # Remove the local parquet file after upload
-            logger.info(f"Removing local file {file_path} after upload.")
+            logger.debug(f"Removing local file {file_path} after upload.")
             remove_file(file_path=file_path)
 
         except Exception as e:

@@ -1,6 +1,11 @@
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.sensors.external_task import ExternalTaskSensor
+from notifier.notifications_template import (
+    get_start_notifier,
+    get_success_notifier,
+    get_failure_notifier,
+)
 from datetime import datetime, timedelta
 
 default_args = {
@@ -31,20 +36,33 @@ with DAG(
     create_tables = BashOperator(
         task_id="create_tables",
         bash_command="mediatech create_tables --model BAAI/bge-m3",
+        on_execute_callback=get_start_notifier(),
+        on_success_callback=get_success_notifier(),
+        on_failure_callback=get_failure_notifier(),
     )
 
     download_and_process_files = BashOperator(
         task_id="download_and_process_files",
         bash_command="mediatech download_and_process_files --source legi --model BAAI/bge-m3",
+        on_execute_callback=get_start_notifier(),
+        on_success_callback=get_success_notifier(),
+        on_failure_callback=get_failure_notifier(),
     )
 
     export_table = BashOperator(
-        task_id="export_table", bash_command="mediatech export_table --table legi"
+        task_id="export_table",
+        bash_command="mediatech export_table --table legi",
+        on_execute_callback=get_start_notifier(),
+        on_success_callback=get_success_notifier(),
+        on_failure_callback=get_failure_notifier(),
     )
 
     upload_dataset = BashOperator(
         task_id="upload_dataset",
         bash_command="mediatech upload_dataset --dataset-name legi",
+        on_execute_callback=get_start_notifier(),
+        on_success_callback=get_success_notifier(),
+        on_failure_callback=get_failure_notifier(),
     )
 
     (

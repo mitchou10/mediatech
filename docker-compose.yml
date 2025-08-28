@@ -21,10 +21,11 @@ x-airflow-common:
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
     RUNNING_IN_DOCKER: 'true'
   volumes:
-    - ./airflow/dags:/opt/airflow/dags
-    - ./airflow/logs:/opt/airflow/logs
-    - ./airflow/config:/opt/airflow/config
-    - ./airflow/plugins:/opt/airflow/plugins
+    - ./airflow_config/dags:/opt/airflow/dags
+    - ./airflow_config/logs:/opt/airflow/logs
+    - ./airflow_config/config:/opt/airflow/config
+    - ./airflow_config/plugins:/opt/airflow/plugins
+    - ./airflow_config/include:/opt/airflow/include
     - ./config/data_history.json:/tmp/mediatech/config/data_history.json
     - ./data:/tmp/mediatech/data
     - ./logs:/tmp/mediatech/logs

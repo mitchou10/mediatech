@@ -1275,7 +1275,7 @@ def process_data(base_folder: str, model: str = "BAAI/bge-m3"):
                             for line in lines
                             if line.strip()
                         ]
-                        logger.info(
+                        logger.debug(
                             f"Removing {len(cid_to_remove)} CIDs from the 'CNIL' table based on {entity}"
                         )
                         for cid in cid_to_remove:
@@ -1335,7 +1335,7 @@ def process_data(base_folder: str, model: str = "BAAI/bge-m3"):
                             for line in lines
                             if line.strip()
                         ]
-                        logger.info(
+                        logger.debug(
                             f"Removing {len(cid_to_remove)} CIDs from the 'CONSTIT' table based on {entity}"
                         )
                         for cid in cid_to_remove:
@@ -1395,7 +1395,7 @@ def process_data(base_folder: str, model: str = "BAAI/bge-m3"):
                             for line in lines
                             if line.strip()
                         ]
-                        logger.info(
+                        logger.debug(
                             f"Removing {len(cid_to_remove)} CIDs from the 'DOLE' table based on {entity}"
                         )
                         for cid in cid_to_remove:
@@ -1457,7 +1457,7 @@ def process_data(base_folder: str, model: str = "BAAI/bge-m3"):
                             for line in lines
                             if line.strip()
                         ]
-                        logger.info(
+                        logger.debug(
                             f"Removing {len(cid_to_remove)} CIDs from the 'LEGI' table based on {entity}"
                         )
                         for cid in cid_to_remove:

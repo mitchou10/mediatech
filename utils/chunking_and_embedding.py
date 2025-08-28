@@ -364,8 +364,6 @@ def make_chunks_sheets(
         )
         info_summary += "\n"
 
-    logger.info(f"Info summary:\n {str(json_file_target)}")
-
     logger.info(f"Chunks created in : {str(json_file_target)}")
 
 

@@ -1,5 +1,10 @@
 from airflow import DAG
 from airflow.operators.bash import BashOperator
+from notifier.notifications_template import (
+    get_start_notifier,
+    get_success_notifier,
+    get_failure_notifier,
+)
 from datetime import datetime, timedelta
 
 default_args = {
@@ -21,6 +26,9 @@ with DAG(
     delete_old_files = BashOperator(
         task_id="delete_old_files",
         bash_command="{{ 'cd /tmp/mediatech && bash scripts/delete_old_files.sh' }}",
+        on_execute_callback=get_start_notifier(),
+        on_success_callback=get_success_notifier(),
+        on_failure_callback=get_failure_notifier(),
     )
 
     delete_old_files

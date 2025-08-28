@@ -23,5 +23,5 @@ dist/
 *.egg-info/
 
 # Airflow
-airflow/config/*.cfg
-airflow/logs
+airflow_config/config/*.cfg
+airflow_config/logs

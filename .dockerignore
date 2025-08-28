@@ -37,4 +37,4 @@ docker-compose.*
 docs/
 
 # Airflow
-airflow/
+airflow_config/

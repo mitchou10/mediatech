@@ -11,7 +11,7 @@ mkdir -p "$LOG_FOLDER"
 if [ "$RUNNING_IN_DOCKER" = "true" ]; then
     AIRFLOW_LOG_FOLDER="/opt/airflow/logs"
 else
-    AIRFLOW_LOG_FOLDER="$PROJECT_DIR/airflow/logs"
+    AIRFLOW_LOG_FOLDER="$PROJECT_DIR/airflow_config/logs"
 fi
 
 PG_BACKUP_FOLDER="$PROJECT_DIR/backups/postgres"

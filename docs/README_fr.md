@@ -57,10 +57,39 @@ Il inclut des scripts pour télécharger, traiter, embedder, insérer ces donné
 
 5.  Définissez la variable `JWT_TOKEN` dans le fichier [`.env`](.env) avec le `access_token` obtenu.
 
+#### Optionnel : Configurer les notifications Tchap
+
+Pour recevoir des notifications en temps réel sur l'exécution des DAGs (démarrage, succès, échec) dans un salon Tchap, vous devez configurer une connexion Apprise dans Airflow.
+> Si vous ne souhaitez pas le faire, vous pouvez simplement supprimer les lignes suivantes dans chaque DAG situé dans [`airflow_config/dags/`](../airflow_config/dags/) :
+
+      on_execute_callback=get_start_notifier(),
+      on_success_callback=get_success_notifier(),
+      on_failure_callback=get_failure_notifier(),
+
+Sinon :
+
+1.  Naviguez vers l'interface utilisateur d'Airflow (généralement `http://localhost:8080`).
+2.  Allez dans **Admin > Connections**.
+3.  Cliquez sur l'icône **`+`** pour ajouter une nouvelle connexion.
+4.  Remplissez le formulaire de connexion avec les détails suivants :
+    *   **Connection Id**: `TchapNotifier`
+    *   **Connection Type**: `Apprise`
+    *   **Extra fields > config**: Construisez l'URL Apprise pour Matrix en utilisant vos variables d'environnement, en suivant ce format :
+        ```
+        {"path": "matrixs://<TCHAP_ACCOUNT_TOKEN>@<TCHAP_SERVER>/<TCHAP_ROOM_TOKEN>/?format=markdown", "tag": "alerts"}
+        ```
+        -   Remplacez `<TCHAP_ACCOUNT_TOKEN>` par la valeur de votre fichier `.env`.
+        -   Remplacez `<TCHAP_SERVER>` par le nom d'hôte du serveur de votre fichier `.env` (par exemple, `matrix.agent.dinum.tchap.gouv.fr`, **sans** le préfixe `https://`).
+        -   Remplacez `<TCHAP_ROOM_TOKEN>` par l'ID du salon de votre fichier `.env`.
+
+5.  Cliquez sur **Save**.
+
+Airflow utilisera désormais cette connexion pour envoyer des notifications formatées à votre salon Tchap spécifié.
+
 #### Téléchargement, Traitement et Téléversement des Données
 
 Vous êtes maintenant prêt à utiliser Airflow et à exécuter les DAGs disponibles.
-Chaque jeu de données a son propre DAG et un [`DAG_Controller`](./airflow/dags/dag_controller.py) est défini pour gérer tous les DAGs de jeux de données et leur ordre d'exécution.
+Chaque jeu de données a son propre DAG et un [`DAG_Controller`](./airflow_config/dags/dag_controller.py) est défini pour gérer tous les DAGs de jeux de données et leur ordre d'exécution.
 
 ### </> Méthode 2 : Utiliser le CLI en local
 
@@ -212,8 +241,9 @@ Ce script va :
   - **[`scripts/initial_deployment.sh`](scripts/initial_deployment.sh)**: Met en place un nouvel environnement serveur en installant Docker, Docker Compose et d'autres dépendances système.
   - **[`scripts/containers_deployment.sh`](scripts/containers_deployment.sh)**: Gère le cycle de vie de l'application en construisant, initialisant et déployant les conteneurs Docker tels que définis dans [docker-compose.yml](docker-compose.yml). Il doit être exécuté après chaque mise à jour du CLI Mediatech ou d'un autre script non partagé avec le conteneur Airflow.
   - **[`scripts/check_running_dags.sh`](scripts/check_running_dags.sh)**: Vérifie l'API d'Airflow pour voir si des pipelines de données (DAGs) sont en cours d'exécution, utilisé pour verrouiller en toute sécurité le processus de déploiement.
-  - **[`scripts/delete_old_files.sh`](scripts/delete_old_files.sh)** : Script shell permettant de supprimer automatiquement les anciens fichiers de différents dossiers tels que [logs/](logs/), [airflow/logs](airflow/logs) et [backups/](backups/). Il conserve les fichiers des X derniers jours et supprime les plus anciens. Ce script peut être exécuté manuellement ou programmé via cron pour garder les dossiers propres.
-- **[`airflow`](airflow/)**: Contient tous les fichiers relatifs à Apache Airflow, y compris les définitions de DAGs (`dags/`), la configuration (`config/`), les logs (`logs/`) et les plugins (`plugins/`). C'est ici que les pipelines d'orchestration de données sont définis et gérés.
+  - **[`scripts/delete_old_files.sh`](scripts/delete_old_files.sh)** : Script shell permettant de supprimer automatiquement les anciens fichiers de différents dossiers tels que [logs/](logs/), [airflow_config/logs](airflow_config/logs) et [backups/](backups/). Il conserve les fichiers des X derniers jours et supprime les plus anciens. Ce script peut être exécuté manuellement ou programmé via cron pour garder les dossiers propres.
+  - **[`scripts/write_tchap_message.sh`](../scripts/write_tchap_message.sh)**: Envoie un message formaté à un salon Tchap spécifié. Il prend le contenu du message en argument et utilise des variables d'environnement pour l'authentification et la destination.
+- **[`airflow_config`](airflow_config/)**: Contient tous les fichiers relatifs à Apache Airflow, y compris les définitions de DAGs (`dags/`), la configuration (`config/`), les logs (`logs/`) et les plugins (`plugins/`). C'est ici que les pipelines d'orchestration de données sont définis et gérés.
 
 ## ⚖️ Licence
 
