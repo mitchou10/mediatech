@@ -58,6 +58,10 @@ jobs:
           
           cd "$PROJECT_DIR"
 
+          export TCHAP_ACCOUNT_TOKEN="${TCHAP_ACCOUNT_TOKEN}"
+          export TCHAP_ROOM_TOKEN="${TCHAP_ROOM_TOKEN}"
+          export TCHAP_SERVER_TOKEN="${TCHAP_SERVER_TOKEN}"
+
           chmod +x ./scripts/write_tchap_message.sh
 
           handle_failure() {
