@@ -1,5 +1,15 @@
 #!/bin/bash
 
+set -e
+
+# Configuration
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+cd $PROJECT_DIR
+
+# Load environment variables from .env file
+export $(grep -v '^#' .env | xargs)
+
 # Sending message's time management
 MX_TXN="`date "+%s"`$(( RANDOM % 9999 ))"
 

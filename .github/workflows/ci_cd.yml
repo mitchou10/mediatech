@@ -39,7 +39,7 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     steps:
-    - name: Code sync
+    - name: Deployment
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.VM_HOST }}
@@ -56,116 +56,54 @@ jobs:
           fi
           
           cd "$PROJECT_DIR"
+
+          chmod +x ./scripts/write_tchap_message.sh
+
+          handle_failure() {
+            local exit_code=$?
+            local line_no=$1
+            echo "DEPLOYMENT FAILED at line $line_no with exit code $exit_code"
+            ./scripts/write_tchap_message.sh "### **❌🛠️ DEPLOYMENT FAILED**" || true
+            ./scripts/write_tchap_message.sh "Failure in the line  **$line_no** with the error code : **$exit_code**" || true
+          }
           
+          trap 'handle_failure $LINENO' ERR
+          
+          ./scripts/write_tchap_message.sh "# 🚀🛠️ Starting new deployment (CD)"
+          ./scripts/write_tchap_message.sh "🕒 **Date:** $(date '+%Y-%m-%d %H:%M:%S')"
+          ./scripts/write_tchap_message.sh "📌 **Step 1: Code sync**"
+
           git pull origin main
-          
+
+          chmod +x ./scripts/*.sh # A second time if needed after git pull
+
           if [ ! -f .env ]; then
             echo "There is no .env file. Please create it from .env.example."
             exit 1
           fi
 
-    - name: System setup (initial deployment)
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.VM_HOST }}
-        username: ${{ secrets.VM_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          set -e 
-
-          PROJECT_DIR="${{ secrets.VM_PROJECT_DIR }}"
-        
-          if [ ! -d "$PROJECT_DIR" ]; then
-            echo "ERROR: Project directory not found: Please check the VM_PROJECT_DIR secret."
-            exit 1
-          fi
-          
-          cd "$PROJECT_DIR"
+          ./scripts/write_tchap_message.sh "📌 **Step 2: System setup**"
 
           if ! command -v docker &> /dev/null; then
             echo "Docker is not installed. Installing Docker..."
-            if [ -f scripts/initial_deployment.sh ]; then
-              sudo chmod +x scripts/initial_deployment.sh
               ./scripts/initial_deployment.sh
-            else
-              echo "Initial deployment script not found."
-              exit 1
-            fi
           else
             echo "Docker detected. Skipping Docker installation."
           fi
 
-    - name: Check lockfile on VM (legacy)
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.VM_HOST }}
-        username: ${{ secrets.VM_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          set -e
-          PROJECT_DIR="${{ secrets.VM_PROJECT_DIR }}"
-
-          if [ ! -d "$PROJECT_DIR" ]; then
-            echo "ERROR: Project directory not found: Please check the VM_PROJECT_DIR secret."
-            exit 1
-          fi
-          
-          cd "$PROJECT_DIR"
+          ./scripts/write_tchap_message.sh "📌 **Step 3: Checking if pipeline's tasks are running**"
 
           if [ -f tmp/update.lock ]; then
             echo "Deployment is locked. Please wait for the current collections update to finish."
             exit 1
           else
-            echo "No collections update in progress, deploying..."
+            echo "No collections update in progress..."
           fi
+
+          ./scripts/check_running_dags.sh
     
-    - name: Check if DAGs are running
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.VM_HOST }}
-        username: ${{ secrets.VM_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          set -e
-          PROJECT_DIR="${{ secrets.VM_PROJECT_DIR }}"
-
-          if [ ! -d "$PROJECT_DIR" ]; then
-            echo "ERROR: Project directory not found: Please check the VM_PROJECT_DIR secret."
-            exit 1
-          fi
+          ./scripts/write_tchap_message.sh "📌 **Step 4: Containers deployment**"
           
-          cd "$PROJECT_DIR"
+          ./scripts/containers_deployment.sh
 
-          if [ -f scripts/check_running_dags.sh ]; then
-            sudo chmod +x scripts/check_running_dags.sh
-            ./scripts/check_running_dags.sh
-          else
-            echo "Running dags check script not found."
-            exit 1
-          fi
-    
-    - name: Containers deployment
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.VM_HOST }}
-        username: ${{ secrets.VM_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          set -e 
-
-          PROJECT_DIR="${{ secrets.VM_PROJECT_DIR }}"
-        
-          if [ ! -d "$PROJECT_DIR" ]; then
-            echo "ERROR: Project directory not found: Please check the VM_PROJECT_DIR secret."
-            exit 1
-          fi
-          
-          cd "$PROJECT_DIR"
-          
-          if [ -f scripts/containers_deployment.sh ]; then
-            sudo chmod +x scripts/containers_deployment.sh
-            ./scripts/containers_deployment.sh
-          else
-            echo "ERROR: scripts/containers_deployment.sh not found"
-            exit 1
-          fi
+          ./scripts/write_tchap_message.sh "✅🛠️ **Deployment successfully completed at $(date '+%Y-%m-%d %H:%M:%S')**"
