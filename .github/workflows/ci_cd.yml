@@ -58,9 +58,12 @@ jobs:
           
           cd "$PROJECT_DIR"
 
-          export TCHAP_ACCOUNT_TOKEN="${TCHAP_ACCOUNT_TOKEN}"
-          export TCHAP_ROOM_TOKEN="${TCHAP_ROOM_TOKEN}"
-          export TCHAP_SERVER_TOKEN="${TCHAP_SERVER_TOKEN}"
+          if [ ! -f .env ]; then
+            echo "There is no .env file. Please create it from .env.example."
+            exit 1
+          else
+            export $(grep -v '^#' .env | xargs)
+          fi
 
           chmod +x ./scripts/write_tchap_message.sh
 
@@ -81,11 +84,6 @@ jobs:
           git pull origin main
 
           chmod +x ./scripts/*.sh # A second time if needed after git pull
-
-          if [ ! -f .env ]; then
-            echo "There is no .env file. Please create it from .env.example."
-            exit 1
-          fi
 
           ./scripts/write_tchap_message.sh "📌 **Step 2: System setup**"
 
