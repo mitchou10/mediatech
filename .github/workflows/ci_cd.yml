@@ -45,10 +45,11 @@ jobs:
         host: ${{ secrets.VM_HOST }}
         username: ${{ secrets.VM_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
+        envs: TCHAP_ACCOUNT_TOKEN,TCHAP_ROOM_TOKEN,TCHAP_SERVER_TOKEN,VM_PROJECT_DIR
         script: |
           set -e 
 
-          PROJECT_DIR="${{ secrets.VM_PROJECT_DIR }}"
+          PROJECT_DIR="${VM_PROJECT_DIR}"
         
           if [ ! -d "$PROJECT_DIR" ]; then
             echo "ERROR: Project directory not found: Please check the VM_PROJECT_DIR secret."
@@ -107,3 +108,8 @@ jobs:
           ./scripts/containers_deployment.sh
 
           ./scripts/write_tchap_message.sh "✅🛠️ **Deployment successfully completed at $(date '+%Y-%m-%d %H:%M:%S')**"
+      env:
+        TCHAP_ACCOUNT_TOKEN: ${{ secrets.TCHAP_ACCOUNT_TOKEN }}
+        TCHAP_ROOM_TOKEN: ${{ secrets.TCHAP_ROOM_TOKEN }}
+        TCHAP_SERVER_TOKEN: ${{ secrets.TCHAP_SERVER_TOKEN }}
+        VM_PROJECT_DIR: ${{ secrets.VM_PROJECT_DIR }}
