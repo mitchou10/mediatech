@@ -5,9 +5,10 @@ set -e
 # Configuration
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Load environment variables
 cd $PROJECT_DIR
-source .env
+
+# Load environment variables from .env file
+export $(grep -v '^#' .env | xargs)
 
 # Variable definitions
 PG_BACKUP_DIR="$PROJECT_DIR/backups/postgres"
