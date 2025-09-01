@@ -111,7 +111,4 @@ jobs:
 
           ./scripts/write_tchap_message.sh "✅🛠️ **Deployment successfully completed at $(date '+%Y-%m-%d %H:%M:%S')**"
       env:
-        TCHAP_ACCOUNT_TOKEN: ${{ secrets.TCHAP_ACCOUNT_TOKEN }}
-        TCHAP_ROOM_TOKEN: ${{ secrets.TCHAP_ROOM_TOKEN }}
-        TCHAP_SERVER_TOKEN: ${{ secrets.TCHAP_SERVER_TOKEN }}
         VM_PROJECT_DIR: ${{ secrets.VM_PROJECT_DIR }}
