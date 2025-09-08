@@ -17,10 +17,36 @@ fi
 PG_BACKUP_FOLDER="$PROJECT_DIR/backups/postgres"
 CONFIG_BACKUP_FOLDER="$PROJECT_DIR/backups/config"
 LOG_FILE="$PROJECT_DIR/logs/delete_old_files_$DATE.log"
+TCHAP_SCRIPT="$PROJECT_DIR/scripts/write_tchap_message.sh"
 
 # Load environment variables from .env file
 export $(grep -v '^#' .env | xargs)
 
+# --- FUNCTIONS ---
+
+# Notification function
+send_tchap_notification() {
+    local message="$1"
+    if [ -f "$TCHAP_SCRIPT" ]; then
+        bash "$TCHAP_SCRIPT" "$message\n"
+    else
+        log "WARNING" "Tchap script not found at $TCHAP_SCRIPT. Skipping notification."
+    fi
+}
+
+notify_step() {
+    local message="$1"
+    log "INFO" "========================================="
+    log "INFO" "$message"
+    log "INFO" "========================================="
+    send_tchap_notification "**$message**"
+}
+
+common_log() {
+    local message="$1"
+    log "INFO" "$message"
+    send_tchap_notification "$message\n"
+}
 # Defining logging function
 log() {
     local level="$1"
@@ -46,15 +72,28 @@ log() {
     esac
 }
 
-# Delete all files older than RETENTION_DAYS
+# --- MAIN ---
+
+log "INFO" "========================================="
+log "INFO" "Starting old files cleanup process"
+log "INFO" "Date: $(date '+%Y-%m-%d %H:%M:%S')"
+log "INFO" "========================================="
+
+send_tchap_notification "# 🚀🧹 Cleanup - Starting process..."
+send_tchap_notification "🕒 **Date:** $(date '+%Y-%m-%d %H:%M:%S')"
+
+# 1. Delete all files older than RETENTION_DAYS
+notify_step "📌 Step 1: Deleting old local log files"
 if [ -d "$LOG_FOLDER" ]; then
 	find "$LOG_FOLDER" -name "*.log" -mtime +$RETENTION_DAYS -delete
-	log "INFO" "Old log files older than $RETENTION_DAYS days have been deleted from $LOG_FOLDER."
+    log "INFO" "Old log files older than $RETENTION_DAYS days have been deleted from $LOG_FOLDER."
 else
 	log "WARNING" "Log folder $LOG_FOLDER does not exist." 
     # Note : It will not write anything to the log file as the log folder does not exist
 fi
 
+# 2. Delete old Airflow logs
+notify_step "📌 Step 2: Deleting old Airflow log files"
 if [ -d "$AIRFLOW_LOG_FOLDER" ]; then
     find "$AIRFLOW_LOG_FOLDER" -name "*.log" -mtime +$RETENTION_DAYS -delete
     # Delete empty folders after deleting log files inside them
@@ -64,6 +103,8 @@ else
     log "WARNING" "Airflow log folder $AIRFLOW_LOG_FOLDER does not exist." 
 fi
 
+# 3. Delete old PostgreSQL backups
+notify_step "📌 Step 3: Deleting old PostgreSQL backup files"
 if [ -d "$PG_BACKUP_FOLDER" ]; then
     find "$PG_BACKUP_FOLDER" -type f -mtime +$RETENTION_DAYS -delete
     log "INFO" "Old PostgreSQL backup files older than $RETENTION_DAYS days have been deleted from $PG_BACKUP_FOLDER."
@@ -71,21 +112,33 @@ else
     log "WARNING" "PostgreSQL backup folder $PG_BACKUP_FOLDER does not exist."
 fi
 
+# 4. Delete old configuration backups
+notify_step "📌 Step 4: Deleting old configuration backup files"
 if [ -d "$CONFIG_BACKUP_FOLDER" ]; then
 	find "$CONFIG_BACKUP_FOLDER" -type f -mtime +$RETENTION_DAYS -delete
-	log "INFO" "Old configuration backup files older than $RETENTION_DAYS days have been deleted from $CONFIG_BACKUP_FOLDER."
+    log "INFO" "Old configuration backup files older than $RETENTION_DAYS days have been deleted from $CONFIG_BACKUP_FOLDER."
 else
 	log "WARNING" "Configuration backup folder $CONFIG_BACKUP_FOLDER does not exist." 
 fi
 
-# Docker Cleanup
-log "INFO" "Starting Docker cleanup..."
+# 5. Docker Cleanup
+notify_step "📌 Step 5: Docker Cleanup"
 if command -v docker &> /dev/null; then
     # Clean up dangling build cache
     log "INFO" "Pruning Docker builder cache..."
-    sudo docker builder prune -f
-
-    log "INFO" "Docker cleanup finished."
+    if docker builder prune -f 2>>"$LOG_FILE"; then
+        log "INFO" "Docker builder cache pruned successfully."
+    else
+        log "ERROR" "Docker builder prune failed."
+        send_tchap_notification "### ❌ **ERROR: Docker builder prune failed**"
+        exit 1
+    fi
 else
     log "WARNING" "Docker command not found. Skipping Docker cleanup."
 fi
+
+log "INFO" "========================================="
+log "INFO" "Cleanup process completed at $(date '+%Y-%m-%d %H:%M:%S')"
+log "INFO" "========================================="
+
+send_tchap_notification "#### ✅ **Cleanup process completed at $(date '+%Y-%m-%d %H:%M:%S')**"
