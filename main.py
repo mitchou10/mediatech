@@ -289,7 +289,7 @@ def main():
                     if args["--input"]
                     else os.path.join(
                         parquet_files_folder,
-                        f"{dataset_name.lower()}",
+                        f"{dataset_name.lower().replace('-', '_')}",
                     )  # Default folder path for the dataset (e.g., ./data/parquet/service_public)
                 )
                 repository = (
