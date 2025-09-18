@@ -45,6 +45,8 @@ def download_and_optionally_process_files(
         if attributes.get("type") == "dila_folder":
             url = attributes.get("download_url", "")
             download_folder = os.path.join(BASE_PATH, attributes.get("download_folder", ""))
+            # Ensure the download folder exists
+            os.makedirs(download_folder, exist_ok=True)
             try:
                 last_downloaded_file = log.get(data_name).get(
                     "last_downloaded_file", ""
@@ -98,8 +100,6 @@ def download_and_optionally_process_files(
                     for filename in tar_gz_files[
                         last_file_index + 1 :
                     ]:  # As we already downloaded the last file, we start from the next file
-                        # Ensure the download folder exists
-                        os.makedirs(download_folder, exist_ok=True)
                         file_url = os.path.join(url, filename)
                         download_path = os.path.join(download_folder, filename)
                         logger.debug(f"Downloading {file_url} to {download_folder}")
