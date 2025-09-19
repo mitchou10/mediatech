@@ -237,7 +237,7 @@ def process_directories(
 
     except Exception as e:
         logger.error(f"Error connecting to the database: {e}")
-        return
+        raise e
 
     ### Loading directory
     directory = []
@@ -617,7 +617,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                 logger.error(
                                     f"PermissionDeniedError (API key issue) for chunk {chunk_index} of file {file_path}: {e}"
                                 )
-                                raise
+                                raise e
 
                         # Inserting all chunks at once
                         if data_to_insert:
@@ -625,6 +625,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
 
                 except Exception as e:
                     logger.error(f"Error processing file {file_path}: {e}")
+                    raise e
                 else:
                     remove_file(file_path=file_path)  # Remove the file after processing
 
@@ -716,6 +717,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
 
                 except Exception as e:
                     logger.error(f"Error processing file {file_path}: {e}")
+                    raise e
                 else:
                     remove_file(file_path=file_path)  # Remove the file after processing
 
@@ -791,7 +793,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                             logger.error(
                                 f"PermissionDeniedError (API key issue) for chunk {chunk_index} of file {file_path}: {e}"
                             )
-                            raise
+                            raise e
 
                     # Inserting all chunks at once
                     if data_to_insert:
@@ -799,6 +801,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
 
                 except Exception as e:
                     logger.error(f"Error processing file {file_path}: {e}")
+                    raise e
                 else:
                     remove_file(file_path=file_path)  # Remove the file after processing
 
@@ -917,7 +920,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
                                 logger.error(
                                     f"PermissionDeniedError (API key issue) for chunk {chunk_index} of file {file_path}: {e}"
                                 )
-                                raise
+                                raise e
 
                     file_content_list = []
                     for k in range(
@@ -1175,6 +1178,7 @@ def process_dila_xml_files(target_dir: str, model: str = "BAAI/bge-m3"):
 
                 except Exception as e:
                     logger.error(f"Error processing file {file_path}: {e}")
+                    raise e
                 else:
                     remove_file(file_path=file_path)  # Remove the file after processing
 

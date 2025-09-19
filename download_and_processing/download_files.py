@@ -143,6 +143,7 @@ def download_and_optionally_process_files(
 
             except Exception as e:
                 logger.error(f"Error downloading files: {e}")
+                raise e
 
         elif attributes.get("type") == "directory":
             download_folder = os.path.join(BASE_PATH, attributes.get("download_folder", ""))
@@ -192,6 +193,7 @@ def download_and_optionally_process_files(
                     )
                 except Exception as e:
                     logger.error(f"Error downloading files: {e}")
+                    raise e
 
                 logger.debug(f"unpacking {data_name} archive...")
                 shutil.unpack_archive(
@@ -435,8 +437,10 @@ def download_and_optionally_process_files(
 
                         except Exception as e:
                             logger.error(f"Error downloading files: {e}")
+                            raise e
                 except Exception as e:
                     logger.error(f"Error downloading data_gouv datasets: {e}")
+                    raise e
             else:
                 logger.error(
                     f"File : {data_name} is not a supported file, skipping download."

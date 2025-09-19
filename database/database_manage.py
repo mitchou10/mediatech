@@ -353,6 +353,7 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
     finally:
         if conn:
             conn.close()
+            logger.debug("PostgreSQL connection closed")
 
 
 def create_table_from_existing(
@@ -428,6 +429,7 @@ def create_table_from_existing(
     finally:
         if conn:
             conn.close()
+            logger.debug("PostgreSQL connection closed")
 
 
 def split_table(source_table: str, target_table: str, data_type: str, value: str):
@@ -445,69 +447,76 @@ def split_table(source_table: str, target_table: str, data_type: str, value: str
     Returns:
         None: Prints success/error messages to logs
     """
-    # Connect to PostgreSQL database
-    conn = psycopg2.connect(
-        host=POSTGRES_HOST,
-        port=POSTGRES_PORT,
-        dbname=POSTGRES_DB,
-        user=POSTGRES_USER,
-        password=POSTGRES_PASSWORD,
-    )
-    cursor = conn.cursor()
+    try:
+        # Connect to PostgreSQL database
+        conn = psycopg2.connect(
+            host=POSTGRES_HOST,
+            port=POSTGRES_PORT,
+            dbname=POSTGRES_DB,
+            user=POSTGRES_USER,
+            password=POSTGRES_PASSWORD,
+        )
+        cursor = conn.cursor()
 
-    if data_type == "category":
-        cursor.execute(f"""
-        SELECT * FROM {source_table} WHERE LOWER(category) = '{value.lower()}'
-        """)
-        rows = cursor.fetchall()
-        if not rows:
-            logger.error(
-                f"No data found for category '{value.upper()}' in table '{source_table.upper()}'"
-            )
-            return
+        if data_type == "category":
+            cursor.execute(f"""
+            SELECT * FROM {source_table} WHERE LOWER(category) = '{value.lower()}'
+            """)
+            rows = cursor.fetchall()
+            if not rows:
+                logger.error(
+                    f"No data found for category '{value.upper()}' in table '{source_table.upper()}'"
+                )
+                return
+            else:
+                columns = [f'"{column[0]}"' for column in cursor.description]
+                placeholders = ", ".join(["%s"] * len(columns))
+                insert_query = f"""
+                INSERT INTO {target_table.upper()} ({", ".join(columns)})
+                VALUES ({placeholders})
+                ON CONFLICT (chunk_id) DO UPDATE SET
+                {", ".join([f"{col}=EXCLUDED.{col}" for col in columns if col != '"chunk_id"'])};
+                """
+                cursor.executemany(insert_query, rows)
+                conn.commit()
+                conn.close()
+                logger.info(
+                    f"Data inserted into table '{target_table.upper()}' for category '{value.upper()}'"
+                )
+        elif data_type == "code":
+            cursor.execute(f"""
+            SELECT * FROM LEGI WHERE LOWER(category) ='code' AND LOWER(unaccent(full_title)) LIKE LOWER(unaccent('%{value.lower().replace("'", "''")}%'))
+            """)
+            rows = cursor.fetchall()
+            if not rows:
+                logger.error(
+                    f"No data found for code '{value.upper()}' in table '{source_table.upper()}'"
+                )
+                return
+            else:
+                columns = [f'"{column[0]}"' for column in cursor.description]
+                placeholders = ", ".join(["%s"] * len(columns))
+                insert_query = f"""
+                INSERT INTO {target_table.upper()} ({", ".join(columns)})
+                VALUES ({placeholders})
+                ON CONFLICT (chunk_id) DO UPDATE SET
+                {", ".join([f"{col}=EXCLUDED.{col}" for col in columns if col != '"chunk_id"'])};
+                """
+                cursor.executemany(insert_query, rows)
+                conn.commit()
+                conn.close()
+                logger.info(
+                    f"Data successfully inserted into table '{target_table.upper()}' for code '{value.upper()}'"
+                )
         else:
-            columns = [f'"{column[0]}"' for column in cursor.description]
-            placeholders = ", ".join(["%s"] * len(columns))
-            insert_query = f"""
-            INSERT INTO {target_table.upper()} ({", ".join(columns)})
-            VALUES ({placeholders})
-            ON CONFLICT (chunk_id) DO UPDATE SET
-            {", ".join([f"{col}=EXCLUDED.{col}" for col in columns if col != '"chunk_id"'])};
-            """
-            cursor.executemany(insert_query, rows)
-            conn.commit()
-            conn.close()
-            logger.info(
-                f"Data inserted into table '{target_table.upper()}' for category '{value.upper()}'"
-            )
-    elif data_type == "code":
-        cursor.execute(f"""
-        SELECT * FROM LEGI WHERE LOWER(category) ='code' AND LOWER(unaccent(full_title)) LIKE LOWER(unaccent('%{value.lower().replace("'", "''")}%'))
-        """)
-        rows = cursor.fetchall()
-        if not rows:
-            logger.error(
-                f"No data found for code '{value.upper()}' in table '{source_table.upper()}'"
-            )
+            logger.error(f"Invalid type '{type}' specified.")
             return
-        else:
-            columns = [f'"{column[0]}"' for column in cursor.description]
-            placeholders = ", ".join(["%s"] * len(columns))
-            insert_query = f"""
-            INSERT INTO {target_table.upper()} ({", ".join(columns)})
-            VALUES ({placeholders})
-            ON CONFLICT (chunk_id) DO UPDATE SET
-            {", ".join([f"{col}=EXCLUDED.{col}" for col in columns if col != '"chunk_id"'])};
-            """
-            cursor.executemany(insert_query, rows)
-            conn.commit()
+    except Exception as e:
+        logger.error(f"Error splitting table data: {e}")
+    finally:
+        if conn:
             conn.close()
-            logger.info(
-                f"Data successfully inserted into table '{target_table.upper()}' for code '{value.upper()}'"
-            )
-    else:
-        logger.error(f"Invalid type '{type}' specified.")
-        return
+            logger.debug("PostgreSQL connection closed")
 
 
 def split_legi_table():
@@ -800,10 +809,14 @@ def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
             return
         cursor.executemany(insert_query, data)
         conn.commit()
-        conn.close()
         logger.debug("Data inserted into PostgreSQL database")
     except Exception as e:
         logger.error(f"Error inserting data into PostgreSQL: {e}\n{data}")
+        raise e
+    finally:
+        if conn:
+            conn.close()
+            logger.debug("PostgreSQL connection closed")
 
 
 def postgres_to_qdrant(
@@ -907,9 +920,13 @@ def postgres_to_qdrant(
             )
 
         conn.commit()
-        conn.close()
     except Exception as e:
         logger.error(f"Error inserting data into Qdrant: {e}")
+        raise e
+    finally:
+        if conn:
+            conn.close()
+            logger.debug("PostgreSQL connection closed")
 
 
 def remove_data(table_name: str, column: str, value: str):
@@ -937,12 +954,15 @@ def remove_data(table_name: str, column: str, value: str):
         delete_query = f"DELETE FROM {table_name.upper()} WHERE {column} = %s"
         cursor.execute(delete_query, (value,))
         conn.commit()
-        conn.close()
         logger.info(
             f"Data removed from {table_name.upper()} table where {column} = {value} (if exists)"
         )
     except Exception as e:
         logger.error(f"Error removing data from PostgreSQL: {e}")
+    finally:
+        if conn:
+            conn.close()
+            logger.debug("PostgreSQL connection closed")
 
 
 def sync_obsolete_doc_ids(table_name: str, old_doc_ids: list, new_doc_ids: list):
