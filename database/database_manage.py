@@ -70,11 +70,11 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
                 logger.error(
                     "pgvector extension could not be enabled. Please check if it's installed in your PostgreSQL instance."
                 )
-                return
+                raise Exception("pgvector extension not enabled")
             logger.info("pgvector extension enabled successfully")
         except Exception as e:
             logger.error(f"Error enabling pgvector extension: {e}")
-            return
+            raise e
 
         with open(config_file_path, "r") as file:
             config = json.load(file)
@@ -341,7 +341,7 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
                     logger.error(
                         f"Error creating HNSW index on {table_name.upper()} table: {e}"
                     )
-                    raise
+                    raise e
 
                 conn.commit()
                 logger.info(
@@ -350,6 +350,7 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
 
     except Exception as e:
         logger.error(f"Error creating tables in PostgreSQL: {e}")
+        raise e
     finally:
         if conn:
             conn.close()
@@ -860,6 +861,7 @@ def postgres_to_qdrant(
             logger.info(f"Collection '{collection_name}' deleted successfully")
         except Exception as e:
             logger.error(f"Error deleting collection '{collection_name}': {e}")
+            raise e
 
     # Create the Qdrant collection if it doesn't exist
     qdrant_client.recreate_collection(
