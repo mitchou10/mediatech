@@ -23,7 +23,7 @@ def download_and_optionally_process_files(
     config_file_path: str,
     data_history_path: str,
     process: bool = False,
-    streaming: bool = False,
+    streaming: bool = True,
     model: str = "BAAI/bge-m3",
 ):
     """
