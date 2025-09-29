@@ -15,7 +15,7 @@ from config import (
     config_file_path,
 )
 from utils import (
-    generate_embeddings,
+    generate_embeddings_with_retry,
     format_model_name,
     format_to_table_name,
     extract_legi_data,
@@ -54,7 +54,7 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
         )
         cursor = conn.cursor()
         logger.info("Connected to PostgreSQL database")
-        probe_vector = generate_embeddings(data="Hey, I'am a probe", model=model)[0]
+        probe_vector = generate_embeddings_with_retry(data="Hey, I'am a probe", model=model)[0]
         embedding_size = len(probe_vector)
 
         model_name = format_model_name(model)
@@ -277,6 +277,7 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
                             start_date TEXT,
                             end_date TEXT,
                             nota TEXT,
+                            links JSONB,
                             text TEXT,
                             chunk_text TEXT,
                             "embeddings_{model_name}" vector({embedding_size}),
@@ -598,7 +599,7 @@ def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
             "CNIL",
             "CONSTIT",
             "DOLE",
-        ]:  # Only for data having a DILA cid
+        ]:  # Only for data having a DILA cid (doc_id)
             # Delete the existing data for the same doc_id in order to avoid duplicates and outdated data
             source_doc_id = data[0][
                 1
@@ -737,8 +738,8 @@ def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
 
         elif table_name.lower() == "legi":
             insert_query = f"""
-                INSERT INTO LEGI (chunk_id, doc_id, chunk_index, chunk_xxh64, nature, category, ministry, status, title, full_title, subtitles, number, start_date, end_date, nota, text, chunk_text, "embeddings_{model_name}")
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO LEGI (chunk_id, doc_id, chunk_index, chunk_xxh64, nature, category, ministry, status, title, full_title, subtitles, number, start_date, end_date, nota, links, text, chunk_text, "embeddings_{model_name}")
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (chunk_id) DO UPDATE SET
                 doc_id = EXCLUDED.doc_id,
                 chunk_index = EXCLUDED.chunk_index,
@@ -754,6 +755,7 @@ def insert_data(data: list, table_name: str, model="BAAI/bge-m3"):
                 start_date = EXCLUDED.start_date,
                 end_date = EXCLUDED.end_date,
                 nota = EXCLUDED.nota,
+                links = EXCLUDED.links,
                 text = EXCLUDED.text,
                 chunk_text = EXCLUDED.chunk_text,
                 "embeddings_{model_name}" = EXCLUDED."embeddings_{model_name}";
@@ -849,7 +851,7 @@ def postgres_to_qdrant(
         sparse vector embeddings to support hybrid search.
     """
 
-    probe_vector = generate_embeddings(data="Hey, I'am a probe", model=model)[0]
+    probe_vector = generate_embeddings_with_retry(data="Hey, I'am a probe", model=model)[0]
     embedding_size = len(probe_vector)
     model_name = format_model_name(model)
     bm25_embedding_model = SparseTextEmbedding("Qdrant/bm25")  # For hybrid search
@@ -1035,3 +1037,4 @@ def sync_obsolete_doc_ids(table_name: str, old_doc_ids: list, new_doc_ids: list)
     finally:
         if conn:
             conn.close()
+            logger.debug("PostgreSQL connection closed")

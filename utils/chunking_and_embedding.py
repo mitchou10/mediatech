@@ -69,7 +69,7 @@ class CorpusHandler(ABC):
             )
             # batch_embeddings = generate_embeddings_with_retry(
             #     data=[x.get("chunk_text") for x in batch], attempts=5, model=model
-            # )
+            # ) # For API insertion
             if len([x for x in batch_embeddings if x is not None]) == 0:
                 continue
             yield batch, batch_embeddings
@@ -180,7 +180,7 @@ def generate_embeddings_with_retry(
                 )
                 raise
             logger.error(
-                f"Error generating embeddings for : {data}. Error: {e}. Retrying in {time_sleep} seconds (attempt {attempt + 1}/5)"
+                f"Error generating embeddings for : {data}. Error: {e}. Retrying in {time_sleep} seconds (attempt {attempt + 1}/{attempts})"
             )
             time.sleep(time_sleep)  # Waiting {time_sleep} seconds before retrying
 
@@ -389,7 +389,7 @@ def make_chunks_sheets(
     logger.info(f"Chunks created in : {str(json_file_target)}")
 
 
-def dole_cut_file_content(text: str):
+def _dole_cut_file_content(text: str):
     """
     Splits legal text into individual articles based on article numbering patterns.
 
@@ -437,11 +437,11 @@ def dole_cut_file_content(text: str):
                     )
             return all_articles
         else:
-            print("No articles found in the text.")
+            logger.debug("No articles found in the text.")
             return []
 
 
-def dole_cut_exp_memo(text: str, section: str) -> str:
+def _dole_cut_exp_memo(text: str, section: str) -> str:
     """
     Extract and parse legal document sections (introduction or articles) from French legal text.
 
@@ -456,7 +456,7 @@ def dole_cut_exp_memo(text: str, section: str) -> str:
         str: Empty string if text is empty or no content found
     """
 
-    def get_number_of_articles(text: str) -> int:
+    def _get_number_of_articles(text: str) -> int:
         # Finding all occurrences of "Article n" or "Article n-er"
         pattern = re.compile(r"(?:L['’] ?)?[Aa]rticle\s+(?:\d{1,2})(?!-)(?:er)?\b")
         number_pattern = re.compile(r"\d{1,2}")
@@ -474,7 +474,6 @@ def dole_cut_exp_memo(text: str, section: str) -> str:
                 return max(numbers)
             except ValueError:
                 # If conversion fails, return 0
-                print("matches:", matches)
                 logger.debug("Error converting article numbers to integers.")
                 return 0
         else:
@@ -507,7 +506,7 @@ def dole_cut_exp_memo(text: str, section: str) -> str:
         return intro
 
     elif section.lower() == "articles":
-        number_of_articles = get_number_of_articles(text=text)
+        number_of_articles = _get_number_of_articles(text=text)
         all_articles = []
 
         # Finding all articles and titles in the rest of the text
