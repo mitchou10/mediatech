@@ -1239,6 +1239,7 @@ def process_dila_xml_files(
                         )
                     except Exception as e:
                         logger.error(f"XML parsing error for file {file.name}: {e}")
+                        raise e
         except Exception as e:
             logger.error(f"Error processing archive {source_path}: {e}")
             raise e
