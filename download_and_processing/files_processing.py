@@ -80,7 +80,7 @@ def process_data_gouv_files(target_dir: str, model: str = "BAAI/bge-m3"):
 
         except Exception as e:
             logger.error(f"Error connecting to the database: {e}")
-            return
+            raise e
 
         all_new_doc_ids = []
         df = df[
@@ -1000,6 +1000,7 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                         logger.error(
                             f"Error merging data for article number {num}: {e}"
                         )
+                        raise e
 
                 # Adding all articles with article_number = None
                 for d in articles_synthesis_dict:
@@ -1191,6 +1192,9 @@ def _handle_dila_suppression_list(lines: list[str], table_name: str, source_name
         logger.error(
             f"Error removing document IDs from suppression list for {source_name}: {e}"
         )
+        raise Exception(
+            f"Error removing document IDs from suppression list for {source_name}: {e}"
+        )
 
 
 def process_dila_xml_files(
@@ -1258,6 +1262,7 @@ def process_dila_xml_files(
                         )
                     except Exception as e:
                         logger.error(f"Error processing file {file_name}: {e}")
+                        raise e
                     finally:
                         remove_file(
                             file_path=file_path
@@ -1298,7 +1303,7 @@ def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int 
 
     except Exception as e:
         logger.error(f"Error connecting to the database: {e}")
-        return
+        raise e
 
     with open(os.path.join(target_dir, "sheets_as_chunks.json")) as f:
         documents = json.load(f)
@@ -1419,7 +1424,7 @@ def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int 
         logger.error(
             f"Unknown table name '{table_name}' for target directory '{target_dir}'."
         )
-        return
+        raise ValueError(f"Unknown table name '{table_name}' for target directory '{target_dir}'.")
 
 
 def process_data(base_folder: str, streaming: bool = True, model: str = "BAAI/bge-m3"):
@@ -1555,7 +1560,9 @@ def process_data(base_folder: str, streaming: bool = True, model: str = "BAAI/bg
                             logger.error(
                                 f"Error removing document IDs based on suppression list: {e}"
                             )
-                            continue
+                            raise Exception(
+                                f"Error removing document IDs based on suppression list: {e}"
+                            )
 
                 # Process the XML files in the target directory
                 target_dir = os.path.join(
@@ -1623,7 +1630,7 @@ def process_data(base_folder: str, streaming: bool = True, model: str = "BAAI/bg
                                     break  # On a trouvé la liste, on arrête de chercher
                 except Exception as e:
                     logger.error(
-                        f"Error reading suppression list from archive {entity}: {e}"
+                        f"Error while finding suppression list from archive {entity}: {e}"
                     )
                     continue
 
