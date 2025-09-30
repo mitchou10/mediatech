@@ -1229,7 +1229,10 @@ def process_dila_xml_files(
                     try:
                         file_name = os.path.basename(file.name)
                         # Reading file in memory
-                        file_content = tar.extractfile(file).read()
+                        file_object = tar.extractfile(file)
+                        if file_object:
+                            with file_object as f:
+                                file_content = f.read()
                         root = ET.fromstring(file_content)
                         _process_dila_xml_content(
                             root=root, file_name=file_name, model=model
