@@ -461,8 +461,7 @@ def download_and_optionally_process_files(
 
     except Exception as e:
         logger.error(f"Error processing {data_name}: {e}")
-        return
-
+        raise e
 
 def download_and_optionally_process_all_files(
     config_file_path: str,

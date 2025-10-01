@@ -8,6 +8,7 @@ from openai import PermissionDeniedError
 from tqdm import tqdm
 import xxhash
 import tarfile
+import gc
 
 from database import insert_data, remove_data, sync_obsolete_doc_ids
 from config import (
@@ -81,6 +82,10 @@ def process_data_gouv_files(target_dir: str, model: str = "BAAI/bge-m3"):
         except Exception as e:
             logger.error(f"Error connecting to the database: {e}")
             raise e
+        finally:
+            if conn:
+                conn.close()
+                logger.debug("Database connection closed.")
 
         all_new_doc_ids = []
         df = df[
@@ -239,6 +244,10 @@ def process_directories(
     except Exception as e:
         logger.error(f"Error connecting to the database: {e}")
         raise e
+    finally:
+        if conn:
+            conn.close()
+            logger.debug("Database connection closed.")
 
     ### Loading directory
     directory = []
@@ -1227,28 +1236,42 @@ def process_dila_xml_files(
                     for m in tar.getmembers()
                     if m.isfile() and m.name.endswith(".xml")
                 ]
-                for file in tqdm(
-                    files, desc=f"Processing {os.path.basename(source_path)}"
-                ):
-                    try:
-                        file_name = os.path.basename(file.name)
-                        # Reading file in memory
-                        file_object = tar.extractfile(file)
-                        if file_object:
-                            with file_object as f:
-                                file_content = f.read()
-                        root = ET.fromstring(file_content)
-                        _process_dila_xml_content(
-                            root=root, file_name=file_name, model=model
-                        )
-                    except Exception as e:
-                        logger.error(f"XML parsing error for file {file.name}: {e}")
-                        raise e
+
+                batch_size = 50
+                for i in range(0, len(files), batch_size):
+                    batch_files = files[i:i + batch_size]
+                
+                    for file in tqdm(
+                        batch_files, 
+                        desc=f"Processing batch {i//batch_size + 1}/{(len(files)-1)//batch_size + 1} of {os.path.basename(source_path)}"
+                    ):
+                        file_object = None
+                        file_content = None
+                        root = None
+
+                        try:
+                            file_name = os.path.basename(file.name)
+                            # Reading file in memory
+                            file_object = tar.extractfile(file)
+                            if file_object:
+                                with file_object as f:
+                                    file_content = f.read()
+                            root = ET.fromstring(file_content)
+                            _process_dila_xml_content(
+                                root=root, file_name=file_name, model=model
+                            )
+                        except Exception as e:
+                            logger.error(f"XML parsing error for file {file.name}: {e}")
+                            raise e
+                    
+                    gc.collect()
+
         except Exception as e:
             logger.error(f"Error processing archive {source_path}: {e}")
             raise e
         finally:
             remove_file(file_path=source_path)  # Remove the archive after processing
+            gc.collect()
     else:
         for root_dir, dirs, files in os.walk(source_path):
             for file_name in files:
@@ -1267,7 +1290,7 @@ def process_dila_xml_files(
                         remove_file(
                             file_path=file_path
                         )  # Remove the file after processing
-
+                        gc.collect()
 
 def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int = 10):
     table_name = ""
@@ -1304,6 +1327,10 @@ def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int 
     except Exception as e:
         logger.error(f"Error connecting to the database: {e}")
         raise e
+    finally:
+        if conn:
+            conn.close()
+            logger.debug("Database connection closed.")
 
     with open(os.path.join(target_dir, "sheets_as_chunks.json")) as f:
         documents = json.load(f)
@@ -1618,10 +1645,10 @@ def process_data(base_folder: str, streaming: bool = True, model: str = "BAAI/bg
                                 member.name
                             ).startswith("liste_suppression"):
                                 file_object = tar.extractfile(member)
+                                
                                 if file_object:
-                                    lines = (
-                                        file_object.read().decode("utf-8").splitlines()
-                                    )
+                                    with file_object as f:
+                                        lines = f.read().decode("utf-8").splitlines()
                                     _handle_dila_suppression_list(
                                         lines=lines,
                                         table_name=table_name,
