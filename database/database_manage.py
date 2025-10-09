@@ -36,8 +36,10 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
         - Optionally drops the table if it exists and `delete_existing` is True.
         - Checks if the table already exists; if not, creates it with the appropriate schema.
         - Adds a vector column for embeddings and creates an HNSW index for efficient similarity search.
+        - Creates an index on doc_id column for faster queries.
     - Commits all changes and logs the process.
     Args:
+        model (str): The embedding model to use. Defaults to "BAAI/bge-m3".
         delete_existing (bool, optional): If True, existing tables will be dropped before creation. Defaults to False.
     Raises:
         Logs errors if database connection, extension enabling, table creation, or index creation fails.
@@ -54,7 +56,9 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
         )
         cursor = conn.cursor()
         logger.info("Connected to PostgreSQL database")
-        probe_vector = generate_embeddings_with_retry(data="Hey, I'am a probe", model=model)[0]
+        probe_vector = generate_embeddings_with_retry(
+            data="Hey, I'am a probe", model=model
+        )[0]
         embedding_size = len(probe_vector)
 
         model_name = format_model_name(model)
@@ -118,6 +122,31 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
                 logger.info(
                     f"Table '{table_name.upper()}' already exists in database {POSTGRES_DB}"
                 )
+
+                # Check if doc_id index exists
+                index_name = f"idx_{table_name.lower()}_doc_id"
+                cursor.execute(f"""
+                    SELECT EXISTS (
+                        SELECT 1 FROM pg_indexes 
+                        WHERE tablename = '{table_name.lower()}' 
+                        AND indexname = '{index_name}'
+                    );
+                """)
+                index_exists = cursor.fetchone()[0]
+
+                if not index_exists:
+                    logger.info(
+                        f"Creating missing index {index_name} on existing table..."
+                    )
+                    cursor.execute(f"""
+                        CREATE INDEX IF NOT EXISTS {index_name} 
+                        ON {table_name.upper()}(doc_id);
+                    """)
+                    conn.commit()
+                    logger.info(f"Index {index_name} created successfully")
+                else:
+                    logger.info(f"Index {index_name} already exists")
+
             else:
                 # Create table if doesn't exist
 
@@ -332,21 +361,37 @@ def create_all_tables(model="BAAI/bge-m3", delete_existing: bool = False):
                         )
                     """)
 
-                # Create index for vector similarity search
+                # Create HNSW index for vector similarity search
                 try:
                     cursor.execute(f"""
                         CREATE INDEX ON {table_name.upper()} USING hnsw ("embeddings_{model_name}" vector_cosine_ops)
                         WITH (m = 16, ef_construction = 128);
                     """)
+                    logger.debug(f"HNSW index created on {table_name.upper()}")
                 except Exception as e:
                     logger.error(
                         f"Error creating HNSW index on {table_name.upper()} table: {e}"
                     )
                     raise e
 
+                # Create index on doc_id for faster GROUP BY and WHERE operations
+                try:
+                    cursor.execute(f"""
+                        CREATE INDEX idx_{table_name.lower()}_doc_id 
+                        ON {table_name.upper()}(doc_id);
+                    """)
+                    logger.debug(
+                        f"B-tree index on doc_id created for {table_name.upper()}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error creating doc_id index on {table_name.upper()} table: {e}"
+                    )
+                    raise e
+
                 conn.commit()
                 logger.info(
-                    f"Table '{table_name.upper()}' created successfully in database {POSTGRES_DB}"
+                    f"Table '{table_name.upper()}' created successfully in database {POSTGRES_DB} with indexes"
                 )
 
     except Exception as e:
@@ -851,7 +896,9 @@ def postgres_to_qdrant(
         sparse vector embeddings to support hybrid search.
     """
 
-    probe_vector = generate_embeddings_with_retry(data="Hey, I'am a probe", model=model)[0]
+    probe_vector = generate_embeddings_with_retry(
+        data="Hey, I'am a probe", model=model
+    )[0]
     embedding_size = len(probe_vector)
     model_name = format_model_name(model)
     bm25_embedding_model = SparseTextEmbedding("Qdrant/bm25")  # For hybrid search
