@@ -320,7 +320,7 @@ def make_chunks_sheets(
             s = texts
 
         info[surtitle]["len"].append(len(" ".join(s).split()))
-        index = 0
+        index = 1  # chunk index starting from 1
         for natural_chunk in texts:
             if isinstance(natural_chunk, dict):
                 natural_text_chunk = natural_chunk["text"]

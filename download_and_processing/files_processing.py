@@ -596,8 +596,9 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                 )
                 data_to_insert = []
 
-                for chunk_index, text in enumerate(chunks):
+                for k, text in enumerate(chunks):
                     try:
+                        chunk_index = k + 1  # Start chunk numbering from 1
                         chunk_text = f"{full_title}"
                         if number:
                             chunk_text += f" - Article {number}"
@@ -615,7 +616,7 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                         embeddings = generate_embeddings_with_retry(
                             data=chunk_text, attempts=5, model=model
                         )[0]
-                        chunk_id = f"{cid}_{chunk_index}"  # Unique ID for each chunk, starting from 0
+                        chunk_id = f"{cid}_{chunk_index}"  # Unique ID for each chunk
 
                         new_data = (
                             chunk_id,  # Primary key
@@ -695,8 +696,9 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                 )
                 data_to_insert = []
 
-                for chunk_index, text in enumerate(chunks):
+                for k, text in enumerate(chunks):
                     try:
+                        chunk_index = k + 1  # Start chunk numbering from 1
                         chunk_text = f"{title}\n{text}"
 
                         chunk_xxh64 = xxhash.xxh64(
@@ -707,7 +709,7 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                             data=chunk_text, attempts=5, model=model
                         )[0]
 
-                        chunk_id = f"{cid}_{chunk_index}"  # Unique ID for each chunk, starting from 0
+                        chunk_id = f"{cid}_{chunk_index}"  # Unique ID for each chunk
 
                         new_data = (
                             chunk_id,  # Primary key
@@ -773,8 +775,9 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
             chunks = make_chunks(text=text_content, chunk_size=1500, chunk_overlap=200)
             data_to_insert = []
 
-            for chunk_index, text in enumerate(chunks):
+            for k, text in enumerate(chunks):
                 try:
+                    chunk_index = k + 1  # Start chunk numbering from 1
                     chunk_text = f"{title}\n{text}"
 
                     chunk_xxh64 = xxhash.xxh64(
@@ -785,7 +788,7 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                         data=chunk_text, attempts=5, model=model
                     )[0]
 
-                    chunk_id = f"{cid}_{chunk_index}"  # Unique ID for each chunk, starting from 0
+                    chunk_id = f"{cid}_{chunk_index}"  # Unique ID for each chunk
 
                     new_data = (
                         chunk_id,  # Primary key
@@ -853,7 +856,7 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                     embeddings = generate_embeddings_with_retry(
                         data=chunk_text, attempts=5, model="BAAI/bge-m3"
                     )[0]
-                    chunk_index = 0
+                    chunk_index = 1  # Since there is only one chunk
                     content_type = "explanatory_memorandum"
                     chunk_id = f"{cid}_{chunk_index}"
                     chunk_xxh64 = xxhash.xxh64(
@@ -885,8 +888,9 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                     )
                     raise
             else:
-                for chunk_index, text in enumerate(chunks):
+                for k, text in enumerate(chunks):
                     try:
+                        chunk_index = k + 1  # Start chunk numbering from 1
                         chunk_text = (title + "\n" + text).replace(
                             "\n\n", "\n"
                         )  # Adding the title to the chunk text
@@ -1061,11 +1065,12 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                         chunk_overlap=400,
                     )
 
-                    for chunk_index, text in enumerate(chunks):
-                        chunk_id = f"{cid}_{chunk_index}"  # Unique ID for each chunk, starting from 0
+                    for k, text in enumerate(chunks):
+                        chunk_index = k + 1  # Start chunk numbering from 1
+                        chunk_id = f"{cid}_{chunk_index}"  # Unique ID for each chunk
 
                         if (
-                            chunk_index == 0
+                            chunk_index == 1
                         ):  # Because the first chunk always contains the article number
                             chunk_text = f"{title}\n{text}"
                         else:
@@ -1111,8 +1116,8 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                             raise
 
                 else:  # The chunks will be created by classic chunking
-                    chunk_index = result_number
-                    chunk_id = f"{cid}_{chunk_index}"  # Unique ID for each chunk, starting from 0
+                    chunk_index = result_number + 1
+                    chunk_id = f"{cid}_{chunk_index}"  # Unique ID for each chunk
                     content_type = "dossier_content"
                     chunks = []  # As it is impossible to have an article synthesis without an article number
 
@@ -1239,11 +1244,11 @@ def process_dila_xml_files(
 
                 batch_size = 50
                 for i in range(0, len(files), batch_size):
-                    batch_files = files[i:i + batch_size]
-                
+                    batch_files = files[i : i + batch_size]
+
                     for file in tqdm(
-                        batch_files, 
-                        desc=f"Processing batch {i//batch_size + 1}/{(len(files)-1)//batch_size + 1} of {os.path.basename(source_path)}"
+                        batch_files,
+                        desc=f"Processing batch {i // batch_size + 1}/{(len(files) - 1) // batch_size + 1} of {os.path.basename(source_path)}",
                     ):
                         file_object = None
                         file_content = None
@@ -1263,7 +1268,7 @@ def process_dila_xml_files(
                         except Exception as e:
                             logger.error(f"XML parsing error for file {file.name}: {e}")
                             raise e
-                    
+
                     gc.collect()
 
         except Exception as e:
@@ -1291,6 +1296,7 @@ def process_dila_xml_files(
                             file_path=file_path
                         )  # Remove the file after processing
                         gc.collect()
+
 
 def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int = 10):
     table_name = ""
@@ -1451,7 +1457,9 @@ def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int 
         logger.error(
             f"Unknown table name '{table_name}' for target directory '{target_dir}'."
         )
-        raise ValueError(f"Unknown table name '{table_name}' for target directory '{target_dir}'.")
+        raise ValueError(
+            f"Unknown table name '{table_name}' for target directory '{target_dir}'."
+        )
 
 
 def process_data(base_folder: str, streaming: bool = True, model: str = "BAAI/bge-m3"):
@@ -1645,7 +1653,7 @@ def process_data(base_folder: str, streaming: bool = True, model: str = "BAAI/bg
                                 member.name
                             ).startswith("liste_suppression"):
                                 file_object = tar.extractfile(member)
-                                
+
                                 if file_object:
                                     with file_object as f:
                                         lines = f.read().decode("utf-8").splitlines()
