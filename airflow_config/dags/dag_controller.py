@@ -12,7 +12,7 @@ default_args = {
 
 with DAG(
     "DAG_CONTROLLER",
-    schedule="0 19 * * 5",  # Every Friday at 19:00 (GMT)
+    schedule=None,
     start_date=datetime(2025, 8, 20),
     catchup=False,
     max_active_runs=1,
