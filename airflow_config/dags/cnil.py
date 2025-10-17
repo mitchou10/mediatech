@@ -1,12 +1,12 @@
+from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-from datetime import datetime, timedelta
 from notifier.notifications_template import (
+    get_failure_notifier,
     get_start_notifier,
     get_success_notifier,
-    get_failure_notifier,
 )
-
 
 default_args = {
     "owner": "airflow",

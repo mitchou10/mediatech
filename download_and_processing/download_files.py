@@ -1,19 +1,22 @@
+import json
+import os
+import shutil
 from datetime import datetime
-from urllib.request import urlopen
-from bs4 import BeautifulSoup
 from urllib.error import HTTPError
+from urllib.request import urlopen
+
+import requests
+from bs4 import BeautifulSoup
+
+from config import BASE_PATH, get_logger
 from utils import (
-    load_data_history,
-    load_config,
     download_file,
     extract_and_remove_tar_file,
+    load_config,
+    load_data_history,
 )
+
 from .files_processing import process_data
-from config import get_logger, BASE_PATH
-import os
-import requests
-import json
-import shutil
 
 logger = get_logger(__name__)
 
@@ -462,6 +465,7 @@ def download_and_optionally_process_files(
     except Exception as e:
         logger.error(f"Error processing {data_name}: {e}")
         raise e
+
 
 def download_and_optionally_process_all_files(
     config_file_path: str,

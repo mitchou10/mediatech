@@ -1,6 +1,7 @@
+from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
-from datetime import datetime, timedelta
 
 default_args = {
     "owner": "airflow",

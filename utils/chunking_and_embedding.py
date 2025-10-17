@@ -1,27 +1,28 @@
-from openai import OpenAI
-import numpy as np
-import os
 import json
-import xxhash
-import time
+import os
 import re
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from typing import Optional
-from collections import defaultdict
+import time
 from abc import ABC, abstractmethod
-from openai import PermissionDeniedError
-from typing import Generator
+from collections import defaultdict
+from typing import Generator, Optional
+
+import numpy as np
+import xxhash
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from openai import OpenAI, PermissionDeniedError
 from tqdm import tqdm
-from .sheets_parser import RagSource
-from .data_helpers import doc_to_chunk
+
 from config import (
-    get_logger,
-    API_URL,
     API_KEY,
-    TRAVAIL_EMPLOI_DATA_FOLDER,
-    SERVICE_PUBLIC_PRO_DATA_FOLDER,
+    API_URL,
     SERVICE_PUBLIC_PART_DATA_FOLDER,
+    SERVICE_PUBLIC_PRO_DATA_FOLDER,
+    TRAVAIL_EMPLOI_DATA_FOLDER,
+    get_logger,
 )
+
+from .data_helpers import doc_to_chunk
+from .sheets_parser import RagSource
 
 logger = get_logger(__name__)
 

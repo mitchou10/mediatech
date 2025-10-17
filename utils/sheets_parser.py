@@ -3,15 +3,14 @@ import os
 import string
 import unicodedata
 
-
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
 
 from config import (
-    get_logger,
-    SERVICE_PUBLIC_PRO_DATA_FOLDER,
     SERVICE_PUBLIC_PART_DATA_FOLDER,
+    SERVICE_PUBLIC_PRO_DATA_FOLDER,
     TRAVAIL_EMPLOI_DATA_FOLDER,
+    get_logger,
 )
 
 logger = get_logger(__name__)

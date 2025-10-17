@@ -52,34 +52,36 @@ Examples:
     main.py upload_dataset --all --repository AgentPublic
 """
 
-from docopt import docopt
-import sys
 import os
+import sys
+
+from docopt import docopt
+
 from config import (
-    setup_logging,
-    get_logger,
+    BASE_PATH,
     CNIL_DATA_FOLDER,
-    LEGI_DATA_FOLDER,
     CONSTIT_DATA_FOLDER,
     DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER,
+    DOLE_DATA_FOLDER,
+    HF_TOKEN,
+    LEGI_DATA_FOLDER,
     LOCAL_ADMINISTRATIONS_DIRECTORY_FOLDER,
+    SERVICE_PUBLIC_PART_DATA_FOLDER,
+    SERVICE_PUBLIC_PRO_DATA_FOLDER,
     STATE_ADMINISTRATIONS_DIRECTORY_FOLDER,
     TRAVAIL_EMPLOI_DATA_FOLDER,
-    SERVICE_PUBLIC_PRO_DATA_FOLDER,
-    SERVICE_PUBLIC_PART_DATA_FOLDER,
-    HF_TOKEN,
-    DOLE_DATA_FOLDER,
-    BASE_PATH,
-    parquet_files_folder,
     config_file_path,
     data_history_path,
+    get_logger,
+    parquet_files_folder,
+    setup_logging,
 )
 from database import create_all_tables, split_legi_table
 from download_and_processing import (
-    process_data,
-    process_all_data,
-    download_and_optionally_process_files,
     download_and_optionally_process_all_files,
+    download_and_optionally_process_files,
+    process_all_data,
+    process_data,
 )
 from utils import export_table_to_parquet
 
@@ -302,7 +304,9 @@ def main():
                 )
                 hf = HuggingFace(hugging_face_repo=repository, token=HF_TOKEN)
                 hf.upload_dataset(
-                    dataset_name=dataset_name, local_folder_path=input_path, private=private
+                    dataset_name=dataset_name,
+                    local_folder_path=input_path,
+                    private=private,
                 )
 
         return 0

@@ -1,12 +1,13 @@
+from datetime import datetime, timedelta
+
 from airflow import DAG
 from airflow.operators.bash import BashOperator
+from airflow.sensors.external_task import ExternalTaskSensor
 from notifier.notifications_template import (
+    get_failure_notifier,
     get_start_notifier,
     get_success_notifier,
-    get_failure_notifier,
 )
-from airflow.sensors.external_task import ExternalTaskSensor
-from datetime import datetime, timedelta
 
 default_args = {
     "owner": "airflow",

@@ -1,24 +1,26 @@
+import json
+import uuid
+
 import psycopg2
+from fastembed import SparseTextEmbedding
 from psycopg2.extras import RealDictCursor
 from qdrant_client import QdrantClient, models
-import json
-from fastembed import SparseTextEmbedding
 from tqdm import tqdm
-import uuid
+
 from config import (
-    get_logger,
     POSTGRES_DB,
     POSTGRES_HOST,
+    POSTGRES_PASSWORD,
     POSTGRES_PORT,
     POSTGRES_USER,
-    POSTGRES_PASSWORD,
     config_file_path,
+    get_logger,
 )
 from utils import (
-    generate_embeddings_with_retry,
+    extract_legi_data,
     format_model_name,
     format_to_table_name,
-    extract_legi_data,
+    generate_embeddings_with_retry,
 )
 
 logger = get_logger(__name__)
