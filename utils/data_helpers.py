@@ -1,25 +1,28 @@
-import os
-import shutil
-import re
-import json
 import hashlib
+import json
+import os
+import re
+import shutil
 import tarfile
+from datetime import datetime
+
+import duckdb
+import psycopg2
 import requests
 from tqdm import tqdm
-import psycopg2
-import duckdb
-from datetime import datetime
 from unidecode import unidecode
-from .sheets_parser import RagSource
+
 from config import (
-    get_logger,
     POSTGRES_DB,
     POSTGRES_HOST,
+    POSTGRES_PASSWORD,
     POSTGRES_PORT,
     POSTGRES_USER,
-    POSTGRES_PASSWORD,
+    get_logger,
     parquet_files_folder,
 )
+
+from .sheets_parser import RagSource
 
 logger = get_logger(__name__)
 
@@ -244,7 +247,7 @@ def file_sha256(file_path: str) -> str:
     return h.hexdigest()
 
 
-def make_schedule(plages: list) -> str:
+def _make_schedule(plages: list) -> str:
     """
     Generates a formatted schedule string from a list of time slot dictionaries.
     Used for the metadata 'plage_ouverture' from the directories.

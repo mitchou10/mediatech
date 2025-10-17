@@ -1,48 +1,49 @@
-import os
-import xml.etree.ElementTree as ET
-import pandas as pd
+import gc
 import json
-import psycopg2
+import os
+import tarfile
+import xml.etree.ElementTree as ET
 from datetime import datetime
+
+import pandas as pd
+import psycopg2
+import xxhash
 from openai import PermissionDeniedError
 from tqdm import tqdm
-import xxhash
-import tarfile
-import gc
 
-from database import insert_data, remove_data, sync_obsolete_doc_ids
 from config import (
-    get_logger,
     CNIL_DATA_FOLDER,
-    LEGI_DATA_FOLDER,
     CONSTIT_DATA_FOLDER,
-    LOCAL_ADMINISTRATIONS_DIRECTORY_FOLDER,
-    STATE_ADMINISTRATIONS_DIRECTORY_FOLDER,
-    TRAVAIL_EMPLOI_DATA_FOLDER,
-    SERVICE_PUBLIC_PRO_DATA_FOLDER,
-    SERVICE_PUBLIC_PART_DATA_FOLDER,
     DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER,
     DOLE_DATA_FOLDER,
+    LEGI_DATA_FOLDER,
+    LOCAL_ADMINISTRATIONS_DIRECTORY_FOLDER,
     POSTGRES_DB,
-    POSTGRES_USER,
-    POSTGRES_PASSWORD,
     POSTGRES_HOST,
+    POSTGRES_PASSWORD,
     POSTGRES_PORT,
+    POSTGRES_USER,
+    SERVICE_PUBLIC_PART_DATA_FOLDER,
+    SERVICE_PUBLIC_PRO_DATA_FOLDER,
+    STATE_ADMINISTRATIONS_DIRECTORY_FOLDER,
+    TRAVAIL_EMPLOI_DATA_FOLDER,
+    get_logger,
 )
+from database import insert_data, remove_data, sync_obsolete_doc_ids
 from utils import (
+    CheckpointManager,
     CorpusHandler,
+    _dole_cut_exp_memo,
+    _dole_cut_file_content,
+    _make_schedule,
+    format_subtitles,
     generate_embeddings_with_retry,
     make_chunks,
     make_chunks_directories,
     make_chunks_sheets,
-    _dole_cut_file_content,
-    _dole_cut_exp_memo,
-    remove_folder,
     remove_file,
-    make_schedule,
-    format_subtitles,
+    remove_folder,
 )
-
 
 logger = get_logger(__name__)
 
@@ -52,6 +53,9 @@ def process_data_gouv_files(target_dir: str, model: str = "BAAI/bge-m3"):
     Process data.gouv.fr files by generating embeddings and storing them in database.
     The workflow depends on the file.
 
+    Implements a checkpoint system to resume processing from the last successfully
+    processed row in case of errors.
+
     Args:
         target_dir (str): Directory containing the files to process
         model (str): Model name for embedding generation. Defaults to "BAAI/bge-m3"
@@ -59,7 +63,13 @@ def process_data_gouv_files(target_dir: str, model: str = "BAAI/bge-m3"):
     """
     if DATA_GOUV_DATASETS_CATALOG_DATA_FOLDER.endswith(target_dir):
         table_name = "data_gouv_datasets_catalog"
-        df = pd.read_csv(f"{target_dir}/{table_name}.csv", sep=";", encoding="utf-8")
+        csv_path = f"{target_dir}/{table_name}.csv"
+
+        # Initialiser le checkpoint manager
+        checkpoint = CheckpointManager(csv_path)
+        last_processed_index = checkpoint.load()
+
+        df = pd.read_csv(csv_path, sep=";", encoding="utf-8")
 
         conn = None
         try:
@@ -99,9 +109,19 @@ def process_data_gouv_files(target_dir: str, model: str = "BAAI/bge-m3"):
             + df["description"].astype(str)
         )
 
-        for _, row in tqdm(
-            df.iterrows(), desc=f"Processing {table_name}", total=len(df)
+        total_rows = len(df)
+        logger.info(
+            f"Total rows to process: {total_rows}, "
+            f"Starting from index: {last_processed_index + 1}"
+        )
+
+        for idx, (_, row) in enumerate(
+            tqdm(df.iterrows(), desc=f"Processing {table_name}", total=total_rows)
         ):
+            # Skip already processed rows
+            if idx <= last_processed_index:
+                continue
+
             # Replace nan values with None in the current row
             row = row.where(pd.notna(row), None)
             # Making chunks
@@ -164,7 +184,23 @@ def process_data_gouv_files(target_dir: str, model: str = "BAAI/bge-m3"):
                 embeddings,  # The embedding vector
             )
             all_new_doc_ids.append(doc_id)
-            insert_data(data=[new_data], table_name=table_name)
+
+            try:
+                insert_data(data=[new_data], table_name=table_name)
+                # Save checkpoint after successful insertion
+                checkpoint.save(idx, metadata={"doc_id": doc_id, "table": table_name})
+            except Exception as e:
+                logger.error(
+                    f"Error inserting data for row {idx} (doc_id: {doc_id}): {e}"
+                )
+                logger.error(
+                    "Progress saved. Restart the process to resume from this point."
+                )
+                raise e
+
+        # All rows processed successfully
+        checkpoint.remove()
+        logger.info(f"Successfully processed all {total_rows} rows")
 
         # Sync obsolete doc_ids (remove entries not in all_new_doc_ids) as the file we are processing is the new full dataset
         sync_obsolete_doc_ids(
@@ -187,6 +223,9 @@ def process_directories(
     """
     Processes directory data from JSON files specified in a configuration file, extracts and transforms relevant fields,
     generates embeddings for each directory, and inserts the processed data into a database.
+
+    Implements a checkpoint system to resume processing from the last successfully
+    processed directory entry in case of errors.
 
     Args:
         target_dir (str): The directory path where the JSON files are located.
@@ -222,6 +261,11 @@ def process_directories(
         raise ValueError(
             f"Unknown target directory '{target_dir}' for processing directories."
         )
+
+    # Initialiser le checkpoint manager
+    json_path = f"{target_dir}/{table_name}.json"
+    checkpoint = CheckpointManager(json_path)
+    last_processed_index = checkpoint.load()
 
     conn = None
     try:
@@ -271,20 +315,30 @@ def process_directories(
             f"Unexpected error while loading file {target_dir}/{table_name}.json: {e}"
         )
         raise
-    logger.info(f"Loaded {len(directory)} lines of data from {target_dir}")
+    total_entries = len(directory)
+    logger.info(
+        f"Loaded {total_entries} lines of data from {target_dir}, "
+        f"Starting from index: {last_processed_index + 1}"
+    )
 
     ## Processing data
     all_new_doc_ids = []
     for k, data in tqdm(
-        enumerate(directory), total=len(directory), desc=f"Processing {table_name}"
+        enumerate(directory), total=total_entries, desc=f"Processing {table_name}"
     ):
+        # Skip already processed entries
+        if k <= last_processed_index:
+            # Still collect doc_id for sync
+            doc_id = data.get("id", "")
+            all_new_doc_ids.append(doc_id)
+            continue
+
         chunk_id = data.get("id", "")
         name = data.get("nom", "")
         directory_url = data.get("url_service_public", "")
 
         # Addresses
         addresses = []
-        # addresses_to_concatenate = []
         try:
             for adresse in data.get("adresse", [{}]):
                 # Metadata
@@ -385,7 +439,7 @@ def process_directories(
             pass
 
         # Opening hours
-        opening_hours = make_schedule(data.get("plage_ouverture", []))
+        opening_hours = _make_schedule(data.get("plage_ouverture", []))
 
         # Mobile applications
         mobile_applications = []
@@ -479,12 +533,27 @@ def process_directories(
             embeddings,
         )
 
-        insert_data(
-            data=[new_data],
-            table_name=table_name,
-        )
+        try:
+            insert_data(
+                data=[new_data],
+                table_name=table_name,
+            )
 
-        all_new_doc_ids.append(doc_id)
+            all_new_doc_ids.append(doc_id)
+
+            # Save checkpoint after successful insertion
+            checkpoint.save(k, metadata={"doc_id": doc_id, "table": table_name})
+
+        except Exception as e:
+            logger.error(f"Error inserting data for entry {k} (doc_id: {doc_id}): {e}")
+            logger.error(
+                "Progress saved. Restart the process to resume from this point."
+            )
+            raise e
+
+    # All entries processed successfully
+    checkpoint.remove()
+    logger.info(f"Successfully processed all {total_entries} directory entries")
 
     # Sync obsolete doc_ids (remove entries not in all_new_doc_ids) as the file we are processing is the new full dataset
     sync_obsolete_doc_ids(
@@ -1224,6 +1293,9 @@ def process_dila_xml_files(
       iterating through XML files on disk. Each file is deleted after being
       processed.
 
+    The function implements a checkpoint system to resume processing from the last
+    successfully processed file in case of errors.
+
     Args:
         source_path (str): The path to the source data. This is a path to a
             `.tar.gz` archive if streaming, or a directory if not.
@@ -1232,8 +1304,14 @@ def process_dila_xml_files(
         model (str, optional): The identifier for the embedding model to be
             used in the underlying processing. Defaults to "BAAI/bge-m3".
     """
+    checkpoint = CheckpointManager(source_path)
+
     if streaming:
         logger.info(f"Processing files directly from archive: {source_path}")
+
+        # Load checkpoint to resume from last position
+        last_processed_index = checkpoint.load()
+
         try:
             with tarfile.open(source_path, "r:gz") as tar:
                 files = [
@@ -1242,14 +1320,30 @@ def process_dila_xml_files(
                     if m.isfile() and m.name.endswith(".xml")
                 ]
 
+                total_files = len(files)
+                logger.info(
+                    f"Total files to process: {total_files}, Starting from index: {last_processed_index + 1}"
+                )
+
                 batch_size = 50
                 for i in range(0, len(files), batch_size):
                     batch_files = files[i : i + batch_size]
 
-                    for file in tqdm(
-                        batch_files,
-                        desc=f"Processing batch {i // batch_size + 1}/{(len(files) - 1) // batch_size + 1} of {os.path.basename(source_path)}",
+                    for idx, file in enumerate(
+                        tqdm(
+                            batch_files,
+                            desc=f"Processing batch {i // batch_size + 1}/{(len(files) - 1) // batch_size + 1} of {os.path.basename(source_path)}",
+                        )
                     ):
+                        file_global_index = i + idx
+
+                        # Skip already processed files
+                        if file_global_index <= last_processed_index:
+                            logger.debug(
+                                f"Skipping already processed file index {file_global_index}"
+                            )
+                            continue
+
                         file_object = None
                         file_content = None
                         root = None
@@ -1265,40 +1359,111 @@ def process_dila_xml_files(
                             _process_dila_xml_content(
                                 root=root, file_name=file_name, model=model
                             )
+
+                            # Save checkpoint after successful processing
+                            checkpoint.save(
+                                file_global_index,
+                                metadata={"file_name": file_name, "type": "dila_xml"},
+                            )
+
+                        except ET.ParseError as e:
+                            logger.error(
+                                f"XML parsing error for file {file_name} (index {file_global_index}): {e}"
+                            )
+                            # Continue to next file for parse errors
+                            checkpoint.save(
+                                file_global_index,
+                                metadata={
+                                    "file_name": file_name,
+                                    "error": "parse_error",
+                                },
+                            )
+                            continue
                         except Exception as e:
-                            logger.error(f"XML parsing error for file {file.name}: {e}")
+                            logger.error(
+                                f"Error processing file {file.name} in archive (index {file_global_index}): {e}"
+                            )
+                            logger.error(
+                                "Progress saved. Restart the process to resume from this point."
+                            )
                             raise e
 
                     gc.collect()
+
+                # All files processed successfully, remove checkpoint
+                checkpoint.remove()
+                logger.info(
+                    f"Successfully processed all {total_files} files from {source_path}"
+                )
 
         except Exception as e:
             logger.error(f"Error processing archive {source_path}: {e}")
             raise e
         finally:
-            remove_file(file_path=source_path)  # Remove the archive after processing
+            # Only remove archive if all files were processed successfully
+            if not checkpoint.exists():
+                remove_file(file_path=source_path)
+                logger.info(f"Archive removed: {source_path}")
+            else:
+                logger.info(f"Archive kept for resume: {source_path}")
             gc.collect()
     else:
+        logger.info(f"Processing files from directory: {source_path}")
+
+        # Load checkpoint for non-streaming mode
+        last_processed_index = checkpoint.load()
+        processed_count = 0
+
         for root_dir, dirs, files in os.walk(source_path):
-            for file_name in files:
-                if file_name.endswith(".xml"):
-                    file_path = os.path.join(root_dir, file_name)
-                    try:
-                        tree = ET.parse(file_path)
-                        root = tree.getroot()
-                        _process_dila_xml_content(
-                            root=root, file_name=file_name, model=model
-                        )
-                    except Exception as e:
-                        logger.error(f"Error processing file {file_name}: {e}")
-                        raise e
-                    finally:
-                        remove_file(
-                            file_path=file_path
-                        )  # Remove the file after processing
-                        gc.collect()
+            xml_files = [f for f in files if f.endswith(".xml")]
+
+            for idx, file_name in enumerate(xml_files):
+                # Skip already processed files
+                if processed_count <= last_processed_index:
+                    processed_count += 1
+                    continue
+
+                file_path = os.path.join(root_dir, file_name)
+                try:
+                    tree = ET.parse(file_path)
+                    root = tree.getroot()
+                    _process_dila_xml_content(
+                        root=root, file_name=file_name, model=model
+                    )
+
+                    # Save checkpoint after successful processing
+                    checkpoint.save(
+                        processed_count,
+                        metadata={"file_name": file_name, "type": "dila_xml"},
+                    )
+                    processed_count += 1
+
+                except Exception as e:
+                    logger.error(
+                        f"Error processing file {file_name} (index {processed_count}): {e}"
+                    )
+                    logger.error(
+                        "Progress saved. Restart the process to resume from this point."
+                    )
+                    raise e
+                finally:
+                    remove_file(file_path=file_path)  # Remove the file after processing
+                    gc.collect()
+
+        # All files processed successfully, remove checkpoint
+        checkpoint.remove()
+        logger.info(f"Successfully processed all files from {source_path}")
 
 
 def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int = 10):
+    """
+    Process sheets data with checkpoint support for resume capability.
+
+    Args:
+        target_dir (str): Directory containing the sheets data
+        model (str): Model name for embedding generation
+        batch_size (int): Number of documents to process per batch
+    """
     table_name = ""
     if SERVICE_PUBLIC_PRO_DATA_FOLDER.endswith(
         target_dir
@@ -1311,6 +1476,10 @@ def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int 
         raise ValueError(
             f"Unknown target directory '{target_dir}' for processing sheets."
         )
+
+    json_path = os.path.join(target_dir, "sheets_as_chunks.json")
+    checkpoint = CheckpointManager(source_path=json_path)
+    last_processed_index = checkpoint.load()
 
     conn = None
     try:
@@ -1338,11 +1507,19 @@ def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int 
             conn.close()
             logger.debug("Database connection closed.")
 
-    with open(os.path.join(target_dir, "sheets_as_chunks.json")) as f:
+    with open(json_path, encoding="utf-8") as f:
         documents = json.load(f)
+
+    total_documents = len(documents)
+    logger.info(
+        f"Total documents to process: {total_documents}, "
+        f"Starting from index: {last_processed_index + 1}"
+    )
 
     corpus_name = target_dir.split("/")[-1]
     corpus_handler = CorpusHandler.create_handler(corpus_name, documents)
+
+    processed_count = 0
 
     if table_name == "travail_emploi":
         all_new_doc_ids = []
@@ -1353,6 +1530,12 @@ def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int 
             data_to_insert = []
 
             for document, embeddings in zip(batch_documents, batch_embeddings):
+                # Skip already processed documents
+                if processed_count <= last_processed_index:
+                    processed_count += 1
+                    # Still collect doc_id for sync
+                    all_new_doc_ids.append(document["sid"])
+                    continue
                 doc_id = document["sid"]
                 chunk_index = document["chunk_index"]
                 chunk_id = f"{doc_id}_{chunk_index}"
@@ -1385,8 +1568,33 @@ def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int 
                 )
                 all_new_doc_ids.append(doc_id)
                 data_to_insert.append(new_data)
+                processed_count += 1
+
             if data_to_insert:
-                insert_data(data=data_to_insert, table_name=table_name)
+                try:
+                    insert_data(data=data_to_insert, table_name=table_name)
+                    # Save checkpoint after successful batch insertion
+                    checkpoint.save(
+                        processed_count - 1,
+                        metadata={
+                            "table": table_name,
+                            "batch_size": len(data_to_insert),
+                        },
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error inserting batch at index {processed_count}: {e}"
+                    )
+                    logger.error(
+                        "Progress saved. Restart the process to resume from this point."
+                    )
+                    raise e
+
+        # All documents processed successfully
+        checkpoint.remove()
+        logger.info(
+            f"Successfully processed all {total_documents} documents for {table_name}"
+        )
 
         # Sync obsolete doc_ids (remove entries not in all_new_doc_ids) as the file we are processing is the new full dataset
         sync_obsolete_doc_ids(
@@ -1397,12 +1605,20 @@ def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int 
 
     elif table_name == "service_public":
         all_new_doc_ids = []
+        processed_count = 0  # Reset counter for service_public
+
         for batch_documents, batch_embeddings in corpus_handler.iter_docs_embeddings(
             batch_size
         ):
             data_to_insert = []
 
             for document, embeddings in zip(batch_documents, batch_embeddings):
+                # Skip already processed documents
+                if processed_count <= last_processed_index:
+                    processed_count += 1
+                    # Still collect doc_id for sync
+                    all_new_doc_ids.append(document["sid"])
+                    continue
                 doc_id = document["sid"]
                 chunk_index = document["chunk_index"]
                 chunk_id = f"{doc_id}_{chunk_index}"
@@ -1442,9 +1658,33 @@ def process_sheets(target_dir: str, model: str = "BAAI/bge-m3", batch_size: int 
 
                 all_new_doc_ids.append(doc_id)
                 data_to_insert.append(new_data)
+                processed_count += 1
 
             if data_to_insert:
-                insert_data(data=data_to_insert, table_name=table_name)
+                try:
+                    insert_data(data=data_to_insert, table_name=table_name)
+                    # Save checkpoint after successful batch insertion
+                    checkpoint.save(
+                        processed_count - 1,
+                        metadata={
+                            "table": table_name,
+                            "batch_size": len(data_to_insert),
+                        },
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error inserting batch at index {processed_count}: {e}"
+                    )
+                    logger.error(
+                        "Progress saved. Restart the process to resume from this point."
+                    )
+                    raise e
+
+        # All documents processed successfully
+        checkpoint.remove()
+        logger.info(
+            f"Successfully processed all {total_documents} documents for {table_name}"
+        )
 
         # Sync obsolete doc_ids (remove entries not in all_new_doc_ids) as the file we are processing is the new full dataset
         sync_obsolete_doc_ids(
