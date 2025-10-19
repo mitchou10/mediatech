@@ -25,3 +25,5 @@ dist/
 # Airflow
 airflow_config/config/*.cfg
 airflow_config/logs
+
+.coverage
