@@ -8,7 +8,7 @@ keywords = ["IA", "LLM", "ALBERT","DATA", "BIBLIOTHEQUE","MEDIATECH"]
 authors = [
     {name = "Etalab", email = "etalab@modernisation.gouv.fr"}
 ]
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
     "requests==2.32.3",
     "beautifulsoup4==4.13.3",
