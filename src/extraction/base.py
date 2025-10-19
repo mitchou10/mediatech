@@ -2,7 +2,6 @@ from abc import ABC
 from src.utils.data_helpers import extract_tar_file
 from src.schemas.extractions.table import extraction_table
 from src.schemas.extractions.models import (
-    ExtractionModel,
     ExtractionCreateModel,
     ExtractionUpdateModel,
 )

@@ -64,3 +64,6 @@ dev = [
     "pytest-cov>=7.0.0",
     "ruff>=0.14.1",
 ]
+
+[tool.ruff]
+exclude = [".venv", "utils", "config", "database", "download_and_processing"]
