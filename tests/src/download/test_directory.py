@@ -25,4 +25,4 @@ def test_directory_downloader_download_all():
         config_loader=config,
         folder_download="data/unprocessed/state_administrations_directory",
     )
-    downloader.download_all()
+    downloader.download_all(max_download=-1)

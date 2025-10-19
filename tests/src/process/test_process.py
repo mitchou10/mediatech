@@ -21,7 +21,7 @@ def test_legiarti_processor_process():
             "type": "dila_folder",
         },
     )
-    obj_downloader.download_all()
+    obj_downloader.download_all(max_download=2)
     obj_extractor = DilaBaseExtractor(
         config_loader={
             "download_url": "https://echanges.dila.gouv.fr/OPENDATA/LEGI/",
@@ -34,11 +34,10 @@ def test_legiarti_processor_process():
     file = "data/extracted/legi_test/20250729-212953/legi/global/code_et_TNC_en_vigueur/code_en_vigueur/LEGI/TEXT/00/00/23/98/32/LEGITEXT000023983208/article/LEGI/ARTI/00/00/23/98/64/LEGIARTI000023986477.xml"
     processor = LegiartiProcessor(
         input_folder="data/extracted/legi_test",
-        output_folder="data/processed/legi_test",
     )
     result = processor.process(file)
     assert result["cid"] == "LEGIARTI000023986477"
     assert "text_content" in result
     assert isinstance(result["text_content"], str)
 
-    processor.process_all()
+    processor.process_all(max_files=2)

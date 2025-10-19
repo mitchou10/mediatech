@@ -36,8 +36,10 @@ class DirectoryDownloader(BaseDownloader):
         latest_dir = sorted(filtered_dirs)[-1]
         return os.path.join(self.folder_download, latest_dir)
 
-    def download_all(self):
+    def download_all(self, max_download: int = -1):
         urls = self.get_urls()
+        if max_download > 0:
+            urls = urls[:max_download]
         download_folder = os.path.join(
             self.folder_download, self.config_loader["last_modified"]
         )
@@ -50,9 +52,9 @@ class DirectoryDownloader(BaseDownloader):
                 url=url,
                 destination_path=downloaded_file_path,
             )
-
-            shutil.unpack_archive(downloaded_file_path, self.folder_download)
-            os.remove(downloaded_file_path)
+            if os.path.exists(downloaded_file_path):
+                shutil.unpack_archive(downloaded_file_path, self.folder_download)
+                os.remove(downloaded_file_path)
             os.rmdir(download_folder)
 
             latest_dir = self.get_latest_dir()

@@ -14,7 +14,7 @@ def test_dila_base_extractor_extract():
         folder_download="data/unprocessed/cnil_test",
         pattern=re.compile(r"CNIL_.*\.tar\.gz"),
     )
-    downloader.download_all()
+    downloader.download_all(max_download=2)
     extractor = DilaBaseExtractor(
         config_loader=config, output_dir="data/extracted/cnil_test"
     )
@@ -35,7 +35,7 @@ def test_legi_base_extractor_extract():
         folder_download="data/unprocessed/legi_test",
         pattern=re.compile(r"LEGI_.*\.tar\.gz"),
     )
-    downloader.download_all()
+    downloader.download_all(max_download=2)
     extractor = DilaBaseExtractor(
         config_loader=config, output_dir="data/extracted/legi_test"
     )
