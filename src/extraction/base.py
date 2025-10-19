@@ -1,5 +1,10 @@
 from abc import ABC
 from src.utils.data_helpers import extract_tar_file
+from src.schemas.extractions.table import extraction_table
+from src.schemas.extractions.models import (
+    ExtractionCreateModel,
+    ExtractionUpdateModel,
+)
 import os
 from glob import glob
 import tqdm
@@ -20,8 +25,22 @@ class BaseExtractor(ABC):
         os.makedirs(self.output_dir, exist_ok=True)
 
     def extract(self, input_path: str):
-
-        return extract_tar_file(input_path, self.output_dir)
+        record_extraction = extraction_table.get_record_by_uri(uri=input_path)
+        if not record_extraction:
+            logger.warning(f"No extraction record found for {input_path}")
+            return None
+        create_record = ExtractionCreateModel(
+            uri=input_path,
+            status="in_progress",
+            output_path=self.output_dir,
+        )
+        extraction_table.create_record(create_record)
+        extract_tar_file(input_path, self.output_dir)
+        updated_record = ExtractionUpdateModel(
+            output_path=self.output_dir,
+            status="completed",
+        )
+        extraction_table.update_record(record_extraction.id, updated_record)
 
     def get_all_input_paths(self, folder: str, recursive: bool = False) -> list[str]:
         if recursive:

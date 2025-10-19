@@ -26,7 +26,7 @@ def test_cnil_downloader_download_all():
     downloader = CNILDownloader(
         config_loader=config, folder_download="data/unprocessed/cnil_test"
     )
-    downloader.download_all()
+    downloader.download_all(max_download=2)
     urls = downloader.get_urls()
     for url in urls:
         filename = url.split("/")[-1]

@@ -1,11 +1,18 @@
 from abc import ABC, abstractmethod
-import json
-from hashlib import md5
 from glob import glob
 import os
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
 from src.utils.process import process_legiarti, process_cnil_text
+from src.schemas.process.table import process_table
+from src.schemas.legifrance.table import legifrance_table
+from src.schemas.legifrance.models import (
+    LegiFranceCreateModel,
+)
+from src.schemas.process.models import (
+    ProcessRecordUpdateModel,
+)
+
 import logging
 
 
@@ -17,32 +24,38 @@ class BaseProcessor(ABC):
     def __init__(
         self,
         input_folder: str = "data/extracted/",
-        output_folder: str = "data/processed/",
     ):
         self.input_folder = input_folder
-        self.output_folder = output_folder
-        os.makedirs(self.output_folder, exist_ok=True)
 
     @abstractmethod
     def process(self, file_path: str) -> dict:
         pass
 
-    def process_all(self) -> list[dict]:
+    def process_all(self, max_files: int = -1) -> list[dict]:
         files = glob(os.path.join(self.input_folder, "**", "*.xml"), recursive=True)
+        if max_files > 0:
+            files = files[:max_files]
         for file_path in tqdm(files, desc="Processing files"):
-            file_hash = md5(open(file_path, "rb").read()).hexdigest()
-            output_path = os.path.join(self.output_folder, f"{file_hash}.json")
-            if os.path.exists(output_path):
-                logger.info(
-                    f"Processed file {output_path} already exists. Skipping processing."
+            process_record = process_table.get_record_by_uri(uri=file_path)
+            if process_record:
+                if process_record.status == "completed":
+                    logger.info(f"Skipping already processed file: {file_path}")
+                    continue
+            else:
+                process_record = process_table.create_record(
+                    uri=file_path,
+                    status="processing",
                 )
-                continue
 
-            logger.info(f"Processing file: {file_path} | Hash: {file_hash}")
-
-            with open(output_path, "w") as f:
-                result = self.process(file_path)
-                json.dump(result, f)
+            record_id = process_record.id
+            logger.info(f"Processing file: {file_path}")
+            result = self.process(file_path)
+            process_table.update_record(
+                record_id=record_id,
+                updated_record=ProcessRecordUpdateModel(
+                    status="completed" if result else "empty"
+                ),
+            )
 
 
 class LegiartiProcessor(BaseProcessor):
@@ -51,7 +64,25 @@ class LegiartiProcessor(BaseProcessor):
         with open(file_path, "r") as f:
             file_content = f.read()
             root = ET.fromstring(file_content)
-            return process_legiarti(root, os.path.basename(file_path))
+            result = process_legiarti(root, os.path.basename(file_path))
+            if not result:
+                logger.warning(f"No data extracted from file: {file_path}")
+            else:
+                record = legifrance_table.get_record_by_cid(cid=result["cid"])
+                if not record or record.status != "completed":
+                    logger.info(
+                        f"Creating new Legifrance record with CID {result['cid']}"
+                    )
+                else:
+                    logger.info(
+                        f"Legifrance record with CID {result['cid']} already exists and is completed. Skipping creation."
+                    )
+
+                    result["status"] = "completed"
+                    legifrance_table.create_record(
+                        legifrance_data=LegiFranceCreateModel(**result)
+                    )
+            return result
 
 
 class CNILProcessor(BaseProcessor):
