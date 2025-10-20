@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/mitchou10/mediatech/compare/v0.3.0...v0.4.0) (2025-10-20)
+
+
+### Features
+
+* add daily data extraction workflow and enhance download script with date handling ([dfe5f0d](https://github.com/mitchou10/mediatech/commit/dfe5f0d22c33e3b693ef70a41589cad7bee39d8c))
+* enhance argument parsing for download and extraction scripts, adding user ID and date handling ([dfe5f0d](https://github.com/mitchou10/mediatech/commit/dfe5f0d22c33e3b693ef70a41589cad7bee39d8c))
+* enhance data extraction and processing for local administrations directory ([dfe5f0d](https://github.com/mitchou10/mediatech/commit/dfe5f0d22c33e3b693ef70a41589cad7bee39d8c))
+* implement extraction and processing for CNIL and Legiarti datasets ([dfe5f0d](https://github.com/mitchou10/mediatech/commit/dfe5f0d22c33e3b693ef70a41589cad7bee39d8c))
+* update download name to 'service_public_part' and enhance error handling for unsupported types ([dfe5f0d](https://github.com/mitchou10/mediatech/commit/dfe5f0d22c33e3b693ef70a41589cad7bee39d8c))
+
+
+### Bug Fixes
+
+* update default end date to current date in argument parser ([dfe5f0d](https://github.com/mitchou10/mediatech/commit/dfe5f0d22c33e3b693ef70a41589cad7bee39d8c))
+
 ## [0.3.0](https://github.com/mitchou10/mediatech/compare/v0.2.0...v0.3.0) (2025-10-19)
 
 
