@@ -4,10 +4,6 @@ import os
 from tqdm import tqdm
 import xml.etree.ElementTree as ET
 from src.utils.process import process_legiarti, process_cnil_text, process_directories
-from src.schemas.process.table import process_table
-from src.schemas.process.models import (
-    ProcessRecordUpdateModel,
-)
 
 import logging
 
@@ -32,26 +28,9 @@ class BaseProcessor(ABC):
         if max_files > 0:
             files = files[:max_files]
         for file_path in tqdm(files, desc="Processing files"):
-            process_record = process_table.get_record_by_uri(uri=file_path)
-            if process_record:
-                if process_record.status == "completed":
-                    logger.info(f"Skipping already processed file: {file_path}")
-                    continue
-            else:
-                process_record = process_table.create_record(
-                    uri=file_path,
-                    status="processing",
-                )
-
-            record_id = process_record.id
             logger.info(f"Processing file: {file_path}")
-            result = self.process(file_path)
-            process_table.update_record(
-                record_id=record_id,
-                updated_record=ProcessRecordUpdateModel(
-                    status="completed" if result else "empty"
-                ),
-            )
+            self.process(file_path)
+            
 
 
 class LegiartiProcessor(BaseProcessor):

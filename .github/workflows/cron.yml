@@ -4,6 +4,12 @@ on:
     schedule:
         - cron: "0 2 * * *"
     workflow_dispatch:
+        inputs:
+            days_ago:
+                description: "Number of days ago to start from (default: 1 for yesterday)"
+                required: false
+                default: "1"
+                type: string
 
 jobs:
     extract-and-export:
@@ -41,17 +47,19 @@ jobs:
 
             - name: Download data for ${{ matrix.download_name }}
               run: |
+                  DAYS_AGO=${{ github.event.inputs.days_ago || '1' }}
                   uv run scripts/download.py \
                     --download_name ${{ matrix.download_name }} \
-                    --start_date $(date -d "yesterday" +%Y-%m-%d) \
+                    --start_date $(date -d "$DAYS_AGO days ago" +%Y-%m-%d) \
                     --end_date $(date +%Y-%m-%d)
 
             - name: Run extraction for ${{ matrix.download_name }}
               env:
                   HF_TOKEN: ${{ secrets.HF_TOKEN }}
               run: |
+                  DAYS_AGO=${{ github.event.inputs.days_ago || '1' }}
                   uv run scripts/extraction_and_export.py \
                     --download_name ${{ matrix.download_name }} \
                     --user-id ${{ secrets.HF_USER_ID }} \
-                    --start_date $(date -d "yesterday" +%Y-%m-%d) \
+                    --start_date $(date -d "$DAYS_AGO days ago" +%Y-%m-%d) \
                     --end_date $(date +%Y-%m-%d)
