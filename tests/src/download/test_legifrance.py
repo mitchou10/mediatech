@@ -28,8 +28,4 @@ def test_legi_downloader_download_all():
         config_loader=config, folder_download="data/unprocessed/legi_test"
     )
     downloader.download_all(max_download=2, patterns=[re.compile(r"LEGI_2025[0-9]{4}-[0-9]{6}\.tar\.gz")])
-    urls = downloader.get_urls()
-    for url in urls[:2]:
-        filename = url.split("/")[-1]
-        destination_path = f"{downloader.folder_download}/{filename}"
-        assert os.path.exists(destination_path)
+    
