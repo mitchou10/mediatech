@@ -1,0 +1,57 @@
+name: Daily Data Extraction
+
+on:
+    schedule:
+        - cron: "0 2 * * *"
+    workflow_dispatch:
+
+jobs:
+    extract-and-export:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                download_name:
+                    [
+                        legi,
+                        cnil,
+                        constit,
+                        dole,
+                        state_administrations_directory,
+                        local_administrations_directory,
+                        service_public_part,
+                        service_public_pro,
+                    ]
+            fail-fast: false
+            max-parallel: 4
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v4
+              with:
+                  python-version: "3.13"
+
+            - name: Install uv
+              uses: astral-sh/setup-uv@v6
+
+            - name: Install dependencies
+              run: uv sync --dev
+
+            - name: Download data for ${{ matrix.download_name }}
+              run: |
+                  uv run scripts/download.py \
+                    --download_name ${{ matrix.download_name }} \
+                    --start_date $(date -d "yesterday" +%Y-%m-%d) \
+                    --end_date $(date +%Y-%m-%d)
+
+            - name: Run extraction for ${{ matrix.download_name }}
+              env:
+                  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+              run: |
+                  uv run scripts/extraction_and_export.py \
+                    --download_name ${{ matrix.download_name }} \
+                    --user-id ${{ secrets.HF_USER_ID }} \
+                    --start_date $(date -d "yesterday" +%Y-%m-%d) \
+                    --end_date $(date +%Y-%m-%d)

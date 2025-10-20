@@ -62,15 +62,31 @@ def extract_tar_file(file_path: str, extract_path: str):
     Args:
         file_path (str): The path to the .tar.gz file to be extracted.
         extract_path (str): The directory where the contents will be extracted.
+
+    Returns:
+        List[str]: A list of extracted file names.
     """
+    extracted_files = []  # Liste pour stocker les fichiers extraits
     if not os.path.exists(file_path):
         logger.debug(f"File {file_path} does not exist")
-        return
+        return extracted_files
     if not os.path.isdir(extract_path):
         logger.debug(f"Directory {extract_path} does not exist")
-        return
+        return extracted_files
     if file_path.endswith(".tar.gz"):
         logger.debug(f"Found {file_path}")
         logger.debug(f"Extracting {file_path}")
         with tarfile.open(file_path, "r:gz") as tar:
-            tar.extractall(path=extract_path, members=tar.getmembers())
+            members = tar.getmembers()
+
+            # Filtrer uniquement les fichiers (exclure les dossiers)
+            files = [m.name for m in members if m.isfile()]
+
+            logger.info(f"Extracting {len(files)} files from archive")
+            for file_name in files:
+                logger.debug(f"  - {file_name}")
+
+            tar.extractall(path=extract_path, members=members)
+            extracted_files.extend(files)  # Ajouter les fichiers extraits à la liste
+
+    return extracted_files  # Retourner la liste des fichiers extraits
