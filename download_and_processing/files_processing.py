@@ -1061,21 +1061,21 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                     try:
                         merged = {
                             "article_number": num,
-                            "article_synthesis": d1.get(num, {})
-                            .get("article_synthesis", None)
-                            .strip()
-                            if d1.get(num, {}).get("article_synthesis")
-                            else None,
-                            "article_text": d2.get(num, {})
-                            .get("article_text", None)
-                            .strip()
-                            if d2.get(num, {}).get("article_text")
-                            else None,
-                            "article_title": d1.get(num, {})
-                            .get("title_content", None)
-                            .strip()
-                            if d1.get(num, {}).get("title_content")
-                            else None,
+                            "article_synthesis": (
+                                d1.get(num, {}).get("article_synthesis", None).strip()
+                                if d1.get(num, {}).get("article_synthesis")
+                                else None
+                            ),
+                            "article_text": (
+                                d2.get(num, {}).get("article_text", None).strip()
+                                if d2.get(num, {}).get("article_text")
+                                else None
+                            ),
+                            "article_title": (
+                                d1.get(num, {}).get("title_content", None).strip()
+                                if d1.get(num, {}).get("title_content")
+                                else None
+                            ),
                         }
                         results.append(merged)
                     except Exception as e:
@@ -1089,13 +1089,17 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                     if d["article_number"] is None:
                         merged = {
                             "article_number": None,
-                            "article_synthesis": d.get("article_synthesis").strip()
-                            if d.get("article_synthesis")
-                            else None,
+                            "article_synthesis": (
+                                d.get("article_synthesis").strip()
+                                if d.get("article_synthesis")
+                                else None
+                            ),
                             "article_text": None,
-                            "article_title": d.get("title_content").strip()
-                            if d.get("title_content")
-                            else None,
+                            "article_title": (
+                                d.get("title_content").strip()
+                                if d.get("title_content")
+                                else None
+                            ),
                         }
                         results.append(merged)
 
@@ -1104,9 +1108,11 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                         merged = {
                             "article_number": None,
                             "article_synthesis": None,
-                            "article_text": d["article_text"].strip()
-                            if d.get("article_text")
-                            else None,
+                            "article_text": (
+                                d["article_text"].strip()
+                                if d.get("article_text")
+                                else None
+                            ),
                             "article_title": None,
                         }
                         results.append(merged)
@@ -1117,9 +1123,11 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                 ):  # The chunks will be created and chunked by article number
                     content_type = "article"
                     chunks = [
-                        str(result.get("article_synthesis", ""))
-                        if result.get("article_synthesis") is not None
-                        else "",
+                        (
+                            str(result.get("article_synthesis", ""))
+                            if result.get("article_synthesis") is not None
+                            else ""
+                        ),
                     ]
                     if result.get("article_text"):
                         article_text = result.get("article_text")
@@ -1188,7 +1196,9 @@ def _process_dila_xml_content(root: ET.Element, file_name: str, model: str):
                     chunk_index = result_number + 1
                     chunk_id = f"{cid}_{chunk_index}"  # Unique ID for each chunk
                     content_type = "dossier_content"
-                    chunks = []  # As it is impossible to have an article synthesis without an article number
+                    chunks = (
+                        []
+                    )  # As it is impossible to have an article synthesis without an article number
 
                     if result.get("article_text", ""):
                         chunks.append(str(result.get("article_text")).strip())
@@ -1815,7 +1825,9 @@ def process_data(base_folder: str, streaming: bool = True, model: str = "BAAI/bg
             except ValueError:
                 logger.debug(f"There is no '{table_name}' directory in {base_folder}")
 
-            for root_dir in (
+            for (
+                root_dir
+            ) in (
                 all_entities
             ):  # root_dir is the name of each folder inside the base_folder
                 # Remove obscolete CIDs from the table based on the suppression list file
@@ -1882,7 +1894,9 @@ def process_data(base_folder: str, streaming: bool = True, model: str = "BAAI/bg
                 logger.debug(f"There is no freemium file in {all_entities}")
             all_entities = [os.path.join(base_folder, f) for f in all_entities]
 
-            for entity in (
+            for (
+                entity
+            ) in (
                 all_entities
             ):  # entity is the name of each tar.gz file inside the base_folder
                 # Remove obscolete CIDs from the table based on the suppression list file

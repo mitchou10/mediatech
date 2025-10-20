@@ -21,26 +21,33 @@ class BaseExtractor:
 
     def extract(self, input_path: str) -> list[str]:
         return extract_tar_file(input_path, self.output_dir)
-        
 
     def get_all_input_paths(self, folder: str, recursive: bool = False) -> list[str]:
         if recursive:
             return glob(os.path.join(folder, "**", "*.tar.gz"), recursive=True)
         return glob(os.path.join(folder, "*.tar.gz"))
-    
-    def filter_input_paths(self, patterns: list[re.Pattern], recursive: bool = False) -> list[str]:
-        all_paths = self.get_all_input_paths(self.config_loader["download_folder"], recursive)
+
+    def filter_input_paths(
+        self, patterns: list[re.Pattern], recursive: bool = False
+    ) -> list[str]:
+        all_paths = self.get_all_input_paths(
+            self.config_loader["download_folder"], recursive
+        )
         filtered_paths = []
         for path in all_paths:
             file_name = os.path.basename(path)
             for pattern in patterns:
                 if re.search(pattern, file_name):
                     filtered_paths.append(path)
-                    break  
+                    break
         return filtered_paths
-    
-    
-    def extract_all(self, max_extract: int = -1, patterns: list[re.Pattern] = [], recursive: bool = False) -> list[str]:
+
+    def extract_all(
+        self,
+        max_extract: int = -1,
+        patterns: list[re.Pattern] = [],
+        recursive: bool = False,
+    ) -> list[str]:
         logger.info("===================================")
         logger.info("Starting extraction of all files.")
         logger.info(
@@ -51,11 +58,11 @@ class BaseExtractor:
         files_to_process = []
         if patterns:
             files = self.filter_input_paths(patterns, recursive)
-            logger.info(f"{len(files)} files matched the provided patterns.")
+            logger.debug(f"{len(files)} files matched the provided patterns.")
         if max_extract > 0:
             files = files[:max_extract]
         for input_path in tqdm.tqdm(files):
-            logger.info(f"Extracting {input_path}")
+            logger.debug(f"Extracting {input_path}")
 
             files_to_process.extend(self.extract(input_path))
         logger.info("===================================")
@@ -93,18 +100,28 @@ class LegiBaseExtractor(DilaBaseExtractor):
     def __init__(self, config_loader: dict, output_dir: str = "data/extracted/legi/"):
         super().__init__(config_loader, output_dir)
 
+
 class DirectoryBaseExtractor(BaseExtractor):
 
-    def __init__(self, config_loader: dict, output_dir: str = "data/extracted/directory/"):
+    def __init__(
+        self, config_loader: dict, output_dir: str = "data/extracted/directory/"
+    ):
         super().__init__(config_loader, output_dir)
-        
+
     def extract(self, input_path: str) -> list[str]:
         return [input_path]
-    
+
     def get_all_input_paths(self, folder: str, recursive: bool = False) -> list[str]:
         if recursive:
             return glob(os.path.join(folder, "**", "*.json"), recursive=True)
         return glob(os.path.join(folder, "*.json"))
-    
-    def extract_all(self, max_extract: int = -1, patterns: list[re.Pattern] = [], recursive: bool = False) -> list[str]:
-        return self.get_all_input_paths(self.config_loader["download_folder"], recursive)
+
+    def extract_all(
+        self,
+        max_extract: int = -1,
+        patterns: list[re.Pattern] = [],
+        recursive: bool = False,
+    ) -> list[str]:
+        return self.get_all_input_paths(
+            self.config_loader["download_folder"], recursive
+        )
