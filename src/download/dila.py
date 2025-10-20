@@ -4,7 +4,7 @@ from src.utils.dila import get_dila_url
 import logging
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 class DilaDownloader(BaseDownloader):
@@ -16,6 +16,19 @@ class DilaDownloader(BaseDownloader):
     def get_urls(self) -> list[str]:
 
         return get_dila_url(self.config_loader, self.pattern)
+    
+    def filter_urls(self, patterns: list[re.Pattern]) -> list[str]:
+        urls = self.get_urls()
+        filtered_urls = []
+        for url in urls:
+            for pattern in patterns:
+                file_name = url.split("/")[-1]
+                if re.search(pattern, file_name):
+                    filtered_urls.append(url)
+                    break  
+        return filtered_urls
+        
+    
 
 
 class CNILDownloader(DilaDownloader):

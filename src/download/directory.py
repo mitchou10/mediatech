@@ -1,6 +1,7 @@
 from src.download.base import BaseDownloader
 import logging
 import os
+import re
 import requests
 import shutil
 from urllib.request import urlopen
@@ -24,7 +25,8 @@ class DirectoryDownloader(BaseDownloader):
         self.config_loader["last_modified"] = last_modified
 
         return [url]
-
+    
+    
     def get_latest_dir(self) -> str | None:
         filtered_dirs = [
             d
@@ -35,8 +37,11 @@ class DirectoryDownloader(BaseDownloader):
             return None
         latest_dir = sorted(filtered_dirs)[-1]
         return os.path.join(self.folder_download, latest_dir)
+    
+    def filter_urls(self, patterns : list[re.Pattern]) -> list[str]:
+        return self.get_urls()
 
-    def download_all(self, max_download: int = -1):
+    def download_all(self, max_download: int = -1, patterns: list[re.Pattern] = []):
         urls = self.get_urls()
         if max_download > 0:
             urls = urls[:max_download]

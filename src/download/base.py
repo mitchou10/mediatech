@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 import os
+import re
 from src.utils.data_helpers import download_file
-from src.schemas.download.table import download_record_table
-from src.schemas.download.models import DownloadRecordCreate
 import tqdm
 import logging
 
@@ -18,26 +17,22 @@ class BaseDownloader(ABC):
 
     @abstractmethod
     def get_urls(self) -> list[str]: ...
+    
+    @abstractmethod
+    def filter_urls(self, patterns: list[re.Pattern]) -> list[str]: ...
 
     def download(self, url: str, destination_path: str):
-        record = download_record_table.get_record_by_url(url=url)
-        if record:
-            logger.info(f"Record for URL {url} already exists in the database.")
-            return
         download_file(url, destination_path)
-        record_create = DownloadRecordCreate(
-            file_name=destination_path,
-            url=url,
-        )
-        download_record_table.create_record(
-            file_name=record_create.file_name,
-            url=record_create.url,
-        )
-
-    def download_all(self, max_download: int = -1):
+        
+        
+    def download_all(self, max_download: int = -1, patterns: list[re.Pattern] = []):
         urls = self.get_urls()
+        if patterns:
+            urls = self.filter_urls(patterns)
+
         if max_download > 0:
             urls = urls[:max_download]
+        
         for url in tqdm.tqdm(urls):
             filename = url.split("/")[-1]
 
