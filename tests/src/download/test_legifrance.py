@@ -1,5 +1,4 @@
 from src.download.dila import LegiDownloader
-import os
 import re
 
 
