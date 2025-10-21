@@ -5,15 +5,10 @@ import unicodedata
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
+import logging
 
-from config import (
-    SERVICE_PUBLIC_PART_DATA_FOLDER,
-    SERVICE_PUBLIC_PRO_DATA_FOLDER,
-    TRAVAIL_EMPLOI_DATA_FOLDER,
-    get_logger,
-)
-
-logger = get_logger(__name__)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 ### Imported functions from the pyalbert library
 
@@ -386,9 +381,9 @@ def _parse_xml_text(xml_file: str, structured: bool = False) -> dict:
 
         service = {
             "title": normalize(title_tag.get_text(" ", strip=True)),
-            "institution": normalize(source_tag.get_text(" ", strip=True))
-            if source_tag
-            else "",
+            "institution": (
+                normalize(source_tag.get_text(" ", strip=True)) if source_tag else ""
+            ),
             "url": q["URL"],
             "type": q["type"],
         }
@@ -561,63 +556,3 @@ def _parse_travailEmploi(target_dir: str, structured: bool = False) -> list[dict
         docs.append(sheet)
 
     return docs
-
-
-class RagSource:
-    # At this point a sheet is an hybrid dict data structure with with only a set of mandatory fields:
-    # - "sid" -> unique identifier
-    # - "title -> sheet title
-    # - "text" -> main payload
-    # - "context" -> successive subtitle (if structured=True)
-    # - "source" -> The source of the sheet (service-public, vie-publique, legifrance, etc)
-    # - "url" -> URL of the source
-    # Depending on the source, they can have many more attribute...
-
-    @classmethod
-    def is_valid(cls, source):
-        return source in cls.__dict__.values()
-
-    @classmethod
-    def get_sheets(cls, storage_dir: str | None, structured: bool = False):
-        if not storage_dir:
-            raise ValueError("You must give a storage directory.")
-
-        sheets = []
-        if SERVICE_PUBLIC_PART_DATA_FOLDER.endswith(
-            storage_dir
-        ) or SERVICE_PUBLIC_PRO_DATA_FOLDER.endswith(storage_dir):
-            # storage_dir: the base path where files are gonna be written.
-            # target_dir: read-only base path where sheets are read.
-            target_dir = f"{storage_dir}/{storage_dir.split('/')[-1]}"
-            sheets.extend(_parse_xml(target_dir, "text", structured=structured))
-        elif TRAVAIL_EMPLOI_DATA_FOLDER.endswith(storage_dir):
-            base_name = os.path.basename(storage_dir)
-            target_dir = next(
-                (
-                    os.path.join(storage_dir, f)
-                    for f in os.listdir(storage_dir)
-                    if f.startswith(base_name)
-                ),
-                None,
-            )
-            if target_dir is None:
-                logger.error(
-                    f"No file starting with '{base_name}' found in {storage_dir}"
-                )
-                raise FileNotFoundError()
-            sheets.extend(_parse_travailEmploi(target_dir, structured=structured))
-        else:
-            raise NotImplementedError("Rag source unknown")
-
-        # Remove duplicate
-        sids = [x["sid"] for x in sheets]
-        seen = set()
-        to_remove = [i for i, sid in enumerate(sids) if sid in seen or seen.add(sid)]
-        n_dup = len(to_remove)
-        if n_dup > 0:
-            logger.info(f"Dropping {n_dup} duplicated sheets")
-            logger.info([sheets[i]["sid"] for i in to_remove])
-        for ix in sorted(to_remove, reverse=True):
-            sheets.pop(ix)
-
-        return sheets

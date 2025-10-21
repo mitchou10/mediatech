@@ -9,7 +9,7 @@ def test_cnil_processor_process():
     result = processor.process(
         "data/extracted/cnil_test/20250711-212007/cnil/global/CNIL/TEXT/00/00/51/88/07/CNILTEXT000051880710.xml"
     )
-    assert result["cid"] == "CNILTEXT000051880710"
+    assert result["doc_id"] == "CNILTEXT000051880710"
     assert "text_content" in result
     assert isinstance(result["text_content"], str)
 
@@ -22,8 +22,10 @@ def test_legiarti_processor_process():
             "type": "dila_folder",
         },
     )
-    obj_downloader.download_all(max_download=2, patterns=[re.compile(r"LEGI_202510[0-9]{2}-[0-9]{6}\.tar\.gz")])
-    
+    obj_downloader.download_all(
+        max_download=2, patterns=[re.compile(r"LEGI_202510[0-9]{2}-[0-9]{6}\.tar\.gz")]
+    )
+
     obj_extractor = DilaBaseExtractor(
         config_loader={
             "download_url": "https://echanges.dila.gouv.fr/OPENDATA/LEGI/",
