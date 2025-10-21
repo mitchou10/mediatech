@@ -122,7 +122,11 @@ if __name__ == "__main__":
 
             downloader = SheetsDownloader(config, f"data/unprocessed/{download_name}")
             patterns = []
+    elif config.get("type") == "data_gouv":
+        from src.download.data_gouv import DataGouvDownloader
 
+        downloader = DataGouvDownloader(config, f"data/unprocessed/{download_name}")
+        patterns = []
     else:
         raise ValueError(
             f"Download name '{download_name}' is not supported for downloading."

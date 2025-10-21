@@ -52,6 +52,7 @@ class LegiartiProcessor(BaseProcessor):
 
                 return result
             except Exception as e:
+                logger.error(f"Error processing file {file_path}: {e}")
                 return {}
 
 
@@ -114,4 +115,12 @@ class ConstitProcessor(BaseProcessor):
 class SheetsProcessor(BaseProcessor):
     def process(self, file_path: str) -> dict:
         result = process_sheets(file_path, "service_public")
+        return result
+
+
+class DataGouvProcessor(BaseProcessor):
+    def process(self, file_path: str) -> dict:
+        import pandas as pd
+
+        result = pd.read_csv(file_path, sep=";").to_dict(orient="records")
         return result

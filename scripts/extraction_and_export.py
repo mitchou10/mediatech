@@ -147,6 +147,17 @@ if __name__ == "__main__":
         obj = SheetsBaseExtractor(config, output_dir=output_dir, ext=ext)
         patterns = []
         processor = SheetsProcessor(input_folder=output_dir)
+
+    elif config.get("type") == "data_gouv":
+        from src.extraction.data_gouv import DataGouvBaseExtractor
+        from src.process.base import DataGouvProcessor
+
+        ext = ".csv"
+        ID_FIELD = "id"
+        obj = DataGouvBaseExtractor(config, output_dir=output_dir, ext=ext)
+        patterns = []
+        processor = DataGouvProcessor(input_folder=output_dir)
+
     else:
         raise ValueError(
             f"Download name '{download_name}' is not supported for extraction."
@@ -177,6 +188,8 @@ if __name__ == "__main__":
                     result["source_file"] = file
 
     df = pd.DataFrame(data)
+    print(df.head())
+    print(f"Processed {len(df)} records from extracted files.")
 
     try:
         dataset = load_dataset(
