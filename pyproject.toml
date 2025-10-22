@@ -9,7 +9,7 @@ authors = [
     {name = "Etalab", email = "etalab@modernisation.gouv.fr"},
     {name = "SDID", email = "sdid@interieur.gouv.fr"}
 ]
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
     "requests==2.32.3",
     "beautifulsoup4==4.13.3",
