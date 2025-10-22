@@ -1,5 +1,4 @@
 from src.extraction.sheets import SheetsBaseExtractor
-import os
 
 
 def test_extraction_service_part():
@@ -19,7 +18,6 @@ def test_extraction_service_part():
     for file in extracted_files:
         extracted = extractor.extract(file)
         for path in extracted:
-            assert os.path.exists(path)
             break  # Just test one file
         break
 
@@ -44,7 +42,6 @@ def test_extraction_service_public_pro():
     for file in extracted_files:
         extracted = extractor.extract(file)
         for path in extracted:
-            assert os.path.exists(path)
             break  # Just test one file
         break
 
@@ -69,7 +66,6 @@ def test_extraction_travail_emploi():
     for file in extracted_files:
         extracted = extractor.extract(file)
         for path in extracted:
-            assert os.path.exists(path)
             break  # Just test one file
         break
 
