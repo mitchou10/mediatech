@@ -6,7 +6,8 @@ requires-python = ">=3.10"
 license = "MIT"
 keywords = ["IA", "LLM", "ALBERT","DATA", "BIBLIOTHEQUE","MEDIATECH"]
 authors = [
-    {name = "Etalab", email = "etalab@modernisation.gouv.fr"}
+    {name = "Etalab", email = "etalab@modernisation.gouv.fr"},
+    {name = "SDID", email = "sdid@interieur.gouv.fr"}
 ]
 version = "0.4.0"
 dependencies = [
@@ -35,15 +36,6 @@ dev = [
 [project.scripts]
 mediatech = "main:main"
 
-[tool.setuptools.packages.find]
-include = ["config*", "database*", "download_and_processing*", "utils*"]
-
-[tool.setuptools]
-py-modules = ["main"]
-
-[build-system]
-requires = ["setuptools>=45", "wheel"]
-build-backend = "setuptools.build_meta"
 
 [dependency-groups]
 dev = [

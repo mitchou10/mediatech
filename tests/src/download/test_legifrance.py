@@ -26,5 +26,6 @@ def test_legi_downloader_download_all():
     downloader = LegiDownloader(
         config_loader=config, folder_download="data/unprocessed/legi_test"
     )
-    downloader.download_all(max_download=2, patterns=[re.compile(r"LEGI_2025[0-9]{4}-[0-9]{6}\.tar\.gz")])
-    
+    downloader.download_all(
+        max_download=2, patterns=[re.compile(r"LEGI_2025[0-9]{4}-[0-9]{6}\.tar\.gz")]
+    )

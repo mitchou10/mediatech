@@ -1,65 +1,65 @@
 name: Daily Data Extraction
 
 on:
-    schedule:
-        - cron: "0 2 * * *"
-    workflow_dispatch:
-        inputs:
-            days_ago:
-                description: "Number of days ago to start from (default: 1 for yesterday)"
-                required: false
-                default: "1"
-                type: string
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      days_ago:
+        description: "Number of days ago to start from (default: 1 for yesterday)"
+        required: false
+        default: "1"
+        type: string
 
 jobs:
-    extract-and-export:
-        runs-on: ubuntu-latest
-        strategy:
-            matrix:
-                download_name:
-                    [
-                        legi,
-                        cnil,
-                        constit,
-                        dole,
-                        state_administrations_directory,
-                        local_administrations_directory,
-                        service_public_part,
-                        service_public_pro,
-                    ]
-            fail-fast: false
-            max-parallel: 4
+  extract-and-export:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        download_name:
+          [
+            legi,
+            cnil,
+            constit,
+            dole,
+            state_administrations_directory,
+            local_administrations_directory,
+            service_public_part,
+            service_public_pro,
+          ]
+      fail-fast: false
+      max-parallel: 4
 
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Set up Python
-              uses: actions/setup-python@v4
-              with:
-                  python-version: "3.13"
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13"
 
-            - name: Install uv
-              uses: astral-sh/setup-uv@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
 
-            - name: Install dependencies
-              run: uv sync --dev
+      - name: Install dependencies
+        run: uv sync --dev
 
-            - name: Download data for ${{ matrix.download_name }}
-              run: |
-                  DAYS_AGO=${{ github.event.inputs.days_ago || '1' }}
-                  uv run scripts/download.py \
-                    --download_name ${{ matrix.download_name }} \
-                    --start_date $(date -d "$DAYS_AGO days ago" +%Y-%m-%d) \
-                    --end_date $(date +%Y-%m-%d)
+      - name: Download data for ${{ matrix.download_name }}
+        run: |
+          DAYS_AGO=${{ github.event.inputs.days_ago || '1' }}
+          PYTHONPATH=$(pwd) uv run scripts/download.py \
+            --download_name ${{ matrix.download_name }} \
+            --start_date $(date -d "$DAYS_AGO days ago" +%Y-%m-%d) \
+            --end_date $(date +%Y-%m-%d)
 
-            - name: Run extraction for ${{ matrix.download_name }}
-              env:
-                  HF_TOKEN: ${{ secrets.HF_TOKEN }}
-              run: |
-                  DAYS_AGO=${{ github.event.inputs.days_ago || '1' }}
-                  uv run scripts/extraction_and_export.py \
-                    --download_name ${{ matrix.download_name }} \
-                    --user-id ${{ secrets.HF_USER_ID }} \
-                    --start_date $(date -d "$DAYS_AGO days ago" +%Y-%m-%d) \
-                    --end_date $(date +%Y-%m-%d)
+      - name: Run extraction for ${{ matrix.download_name }}
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          DAYS_AGO=${{ github.event.inputs.days_ago || '1' }}
+          PYTHONPATH=$(pwd) uv run scripts/extraction_and_export.py \
+            --download_name ${{ matrix.download_name }} \
+            --user-id ${{ secrets.HF_USER_ID }} \
+            --start_date $(date -d "$DAYS_AGO days ago" +%Y-%m-%d) \
+            --end_date $(date +%Y-%m-%d)
