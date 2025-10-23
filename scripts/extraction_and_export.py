@@ -16,9 +16,9 @@ import re
 import json
 from tqdm import tqdm
 from datetime import datetime, timedelta
-from datasets import load_dataset, Dataset
 import pandas as pd
 import argparse
+from huggingface_hub import HfApi
 
 with open("config/data_config.json", "r") as f:
     CONFIG_LOADER = json.load(f)
@@ -65,6 +65,7 @@ if __name__ == "__main__":
     user_id = args.user_id
     days = (END_DATE - START_DATE).days + 1
     dates = [(START_DATE + timedelta(days=i)).strftime("%Y%m%d") for i in range(days)]
+    api = HfApi()
 
     if download_name not in CONFIG_LOADER:
         raise ValueError(f"Download name '{download_name}' not found in configuration.")
@@ -175,7 +176,9 @@ if __name__ == "__main__":
 
     print(79 * "=")
 
-    output_df_path = f"data/save/{download_name}_full_documents.parquet"
+    output_df_path = (
+        f"data/save/{download_name}/data/{download_name}_full_documents.parquet"
+    )
     file_to_extracts = obj.filter_input_paths(patterns=patterns)
 
     for file_to_extract in file_to_extracts:
@@ -185,6 +188,7 @@ if __name__ == "__main__":
             output_df_path,
             f"source_file={base_name}",
         )
+        print(f"Checking if {parquer_file_path} exists...")
         if not os.path.exists(parquer_file_path):
             file_process = obj.extract(file_to_extract)
             data = []
@@ -211,14 +215,11 @@ if __name__ == "__main__":
                     index=False,
                 )
                 data = []
-        else:
-            print(f"File {base_name} has already been processed. Skipping.")
-    df = pd.read_parquet(output_df_path)
-    print(f"Total records extracted before deduplication: {len(df)}")
-    new_dataset = Dataset.from_pandas(df)
-
-    print(
-        f"Final dataset contains {len(new_dataset)} records after processing and deduplication."
-    )
-    print(new_dataset.column_names)
-    new_dataset.push_to_hub(f"{user_id}/{download_name}-full-documents")
+                api.upload_folder(
+                    folder_path=parquer_file_path,
+                    path_in_repo=f"/data/{download_name}-full-documents.parquet/source_file={base_name}",
+                    repo_id=f"{user_id}/{download_name}-full-documents",
+                    repo_type="dataset",
+                    create_pr=False,
+                )
+                print(f"Uploaded partition for {base_name} to Hugging Face Hub.")
