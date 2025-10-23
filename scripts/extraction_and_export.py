@@ -181,9 +181,7 @@ if __name__ == "__main__":
         exist_ok=True,
     )
 
-    output_df_path = (
-        f"data/save/{download_name}/data/{download_name}_full_documents.parquet"
-    )
+    output_df_path = f"data/{download_name}/data/{download_name}_full_documents.parquet"
     file_to_extracts = obj.filter_input_paths(patterns=patterns)
     print(file_to_extracts)
 
@@ -222,11 +220,10 @@ if __name__ == "__main__":
                 )
                 data = []
     if os.path.exists(output_df_path):
-        api.upload_folder(
-            folder_path=output_df_path,
-            path_in_repo=f"/data/{download_name}-full-documents.parquet/",
+        api.upload_large_folder(
+            folder_path=f"data/{download_name}/",
+            # path_in_repo=f"/data/{download_name}-full-documents.parquet/",
             repo_id=f"{user_id}/{download_name}-full-documents",
             repo_type="dataset",
-            create_pr=False,
         )
         print(f"Uploaded partition for {base_name} to Hugging Face Hub.")
