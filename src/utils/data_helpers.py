@@ -5,6 +5,7 @@ import logging
 import tarfile
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 def download_file(url: str, destination_path: str):
@@ -83,9 +84,6 @@ def extract_tar_file(file_path: str, extract_path: str):
             files = [m.name for m in members if m.isfile()]
 
             logger.info(f"Extracting {len(files)} files from archive")
-            for file_name in files:
-                logger.debug(f"  - {file_name}")
-
             tar.extractall(path=extract_path, members=members)
             extracted_files.extend(files)  # Ajouter les fichiers extraits à la liste
 

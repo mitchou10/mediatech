@@ -175,39 +175,47 @@ if __name__ == "__main__":
 
     print(79 * "=")
 
-    file_to_process = obj.extract_all(max_extract=-1, patterns=patterns)
-    data = []
-    for file in tqdm(file_to_process, desc="Processing files"):
-        if file.endswith(ext):
-            result = processor.process(file_path=os.path.join(output_dir, file))
-            if result:
-                if isinstance(result, list):
-                    data.extend(result)
-                else:
-                    data.append(result)
-                    result["source_file"] = file
+    output_df_path = f"data/save/{download_name}_full_documents.parquet"
+    file_to_extracts = obj.filter_input_paths(patterns=patterns)
 
-    df = pd.DataFrame(data)
-    print(df.head())
-    print(f"Processed {len(df)} records from extracted files.")
-
-    try:
-        dataset = load_dataset(
-            f"{user_id}/{download_name}-full-documents", split="train"
+    for file_to_extract in file_to_extracts:
+        print(f"Extracting from {file_to_extract}")
+        base_name = os.path.basename(file_to_extract).replace(".tar.gz", "")
+        parquer_file_path = os.path.join(
+            output_df_path,
+            f"source_file={base_name}",
         )
-        df_dataset = dataset.to_pandas()
+        if not os.path.exists(parquer_file_path):
+            file_process = obj.extract(file_to_extract)
+            data = []
+            if file_process:
+                for file in tqdm(file_process, desc="Processing files"):
+                    if file.endswith(ext):
 
-        # Combiner les dataframes et supprimer les doublons
-        df_combined = pd.concat([df_dataset, df], ignore_index=True)
-        df_combined: pd.DataFrame = df_combined.drop_duplicates(
-            subset=[ID_FIELD], keep="last"
-        )
-        df_combined.reset_index(drop=True, inplace=True)
-        new_dataset = Dataset.from_pandas(df_combined)
+                        result = processor.process(
+                            file_path=os.path.join(output_dir, file)
+                        )
+                        if result:
+                            if isinstance(result, list):
+                                for item in result:
+                                    item["source_file"] = base_name
+                                data.extend(result)
 
-    except Exception as e:
-        print(f"Dataset not found on hub. Creating new dataset. Error: {e}")
-        new_dataset = Dataset.from_pandas(df)
+                            else:
+                                data.append(result)
+                                result["source_file"] = base_name
+            if data:
+                pd.DataFrame(data).to_parquet(
+                    output_df_path,
+                    partition_cols=["source_file"],
+                    index=False,
+                )
+                data = []
+        else:
+            print(f"File {base_name} has already been processed. Skipping.")
+    df = pd.read_parquet(output_df_path)
+    print(f"Total records extracted before deduplication: {len(df)}")
+    new_dataset = Dataset.from_pandas(df)
 
     print(
         f"Final dataset contains {len(new_dataset)} records after processing and deduplication."
