@@ -175,11 +175,17 @@ if __name__ == "__main__":
     print(f"{ID_FIELD} will be used as the unique identifier field.")
 
     print(79 * "=")
+    api.create_repo(
+        repo_id=f"{user_id}/{download_name}-full-documents",
+        repo_type="dataset",
+        exist_ok=True,
+    )
 
     output_df_path = (
         f"data/save/{download_name}/data/{download_name}_full_documents.parquet"
     )
     file_to_extracts = obj.filter_input_paths(patterns=patterns)
+    print(file_to_extracts)
 
     for file_to_extract in file_to_extracts:
         print(f"Extracting from {file_to_extract}")
@@ -215,11 +221,12 @@ if __name__ == "__main__":
                     index=False,
                 )
                 data = []
-                api.upload_folder(
-                    folder_path=parquer_file_path,
-                    path_in_repo=f"/data/{download_name}-full-documents.parquet/source_file={base_name}",
-                    repo_id=f"{user_id}/{download_name}-full-documents",
-                    repo_type="dataset",
-                    create_pr=False,
-                )
-                print(f"Uploaded partition for {base_name} to Hugging Face Hub.")
+    if os.path.exists(output_df_path):
+        api.upload_folder(
+            folder_path=output_df_path,
+            path_in_repo=f"/data/{download_name}-full-documents.parquet/",
+            repo_id=f"{user_id}/{download_name}-full-documents",
+            repo_type="dataset",
+            create_pr=False,
+        )
+        print(f"Uploaded partition for {base_name} to Hugging Face Hub.")

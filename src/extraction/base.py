@@ -125,3 +125,10 @@ class DirectoryBaseExtractor(BaseExtractor):
         return self.get_all_input_paths(
             self.config_loader["download_folder"], recursive
         )
+
+    def filter_input_paths(
+        self, patterns: list[re.Pattern], recursive: bool = False
+    ) -> list[str]:
+        return self.get_all_input_paths(
+            self.config_loader["download_folder"], recursive
+        )

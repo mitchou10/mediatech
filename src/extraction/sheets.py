@@ -44,3 +44,10 @@ class SheetsBaseExtractor(BaseExtractor):
         for input_path in files:
             files_to_process.extend(self.extract(input_path))
         return files_to_process
+
+    def filter_input_paths(
+        self, patterns: list[re.Pattern], recursive: bool = False
+    ) -> list[str]:
+        return self.get_all_input_paths(
+            self.config_loader["download_folder"], recursive
+        )
