@@ -14,10 +14,10 @@ class DoleExporter(BaseExporter):
         for base in os.listdir(parquet_file):
             parquet_file_path = os.path.join(parquet_file, base)
             if os.path.isdir(parquet_file_path):
-                df = pd.read_parquet(parquet_file_path)
-                print(f"{base}: {len(df)} records")
+
                 df = pd.concat([df, pd.read_parquet(
                     parquet_file_path)], ignore_index=True)
+                print(f"{base}: {len(df)} records")
 
         print(f"Dataframe loaded with {len(df)} records.")
         repo_id = f"{user_id}/{dataset_name}-full-documents"
@@ -29,7 +29,7 @@ class DoleExporter(BaseExporter):
         dataset = Dataset.from_pandas(df)
         commit_message = f"Data update on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         dataset.push_to_hub(repo_id=repo_id, split="train", create_pr=False,
-                            num_proc=4, revision="main", commit_message=commit_message, max_shard_size="500MB")
+                            num_proc=kwargs.get("num_proc", 8), revision="main", commit_message=commit_message, max_shard_size="500MB")
         print(f"Uploaded dataset to Hugging Face Hub at {repo_id}.")
 
 
