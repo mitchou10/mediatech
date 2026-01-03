@@ -12,7 +12,7 @@ from src.exports.administrations_directory import (
     StateAdministrationsDirectoryExporter,
     LocalAdministrationsDirectoryExporter,
 )
-
+from src.exports.data_gouv_datasets_catalog import DataGouvExporter
 from src.process.base import (
     LegiartiProcessor,
     CNILProcessor,
@@ -181,6 +181,7 @@ if __name__ == "__main__":
         obj = DataGouvBaseExtractor(config, output_dir=output_dir, ext=ext)
         patterns = []
         processor = DataGouvProcessor(input_folder=output_dir)
+        exporter = DataGouvExporter()
 
     else:
         raise ValueError(
