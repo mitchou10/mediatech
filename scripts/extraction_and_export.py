@@ -13,6 +13,7 @@ from src.exports.administrations_directory import (
     LocalAdministrationsDirectoryExporter,
 )
 from src.exports.data_gouv_datasets_catalog import DataGouvExporter
+from src.exports.travail_emploi import TravailEmploiExporter
 from src.process.base import (
     LegiartiProcessor,
     CNILProcessor,
@@ -171,6 +172,8 @@ if __name__ == "__main__":
             exporter = ServiceProExporter()
         elif download_name == "service_public_part":
             exporter = ServiceParticulierExporter()
+        elif download_name == "travail_emploi":
+            exporter = TravailEmploiExporter()
 
     elif config.get("type") == "data_gouv":
         from src.extraction.data_gouv import DataGouvBaseExtractor
