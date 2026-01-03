@@ -1,253 +1,187 @@
 # MEDIATECH
 
 [![License](https://img.shields.io/github/license/etalab-ia/mediatech?label=licence&color=red)](https://github.com/etalab-ia/mediatech/blob/main/LICENSE)
-[![French version](https://img.shields.io/badge/🇫🇷-French%20version-blue)](./docs/README_fr.md)
-[![Hugging Face collection](https://img.shields.io/badge/🤗-Hugging%20Face%20collection-yellow)](https://huggingface.co/collections/AgentPublic/mediatech-68309e15729011f49ef505e8)
+[![Hugging Face collection](https://img.shields.io/badge/🤗-Hugging%20Face%20collection-yellow)](https://huggingface.co/collections/hulk10/mediatech)
 
 
 ## 📝 Description
 
-This project processes public data made available by various administrations in order to facilitate access to vectorized and ready-to-use public data for AI applications in the public sector.
-It includes scripts for downloading, processing, embedding, and inserting this data into a PostgreSQL database, and facilitates its export via various means.
+MEDIATECH automatise la collecte, l'extraction et la publication de jeux de données publics français sur Hugging Face. Ce projet facilite l'accès aux données administratives françaises pour les applications d'IA en maintenant à jour la collection [hulk10/mediatech](https://huggingface.co/collections/hulk10/mediatech).
 
-## 💡 Tutorial
+## 🎯 Objectif
 
-### 𖣘 Method 1 : Airflow
+Mettre à jour automatiquement les datasets de la collection [hulk10/mediatech](https://huggingface.co/collections/hulk10/mediatech) à partir des sources officielles françaises (DILA, data.gouv.fr, etc.).
 
-#### Installing and configuring dependencies
+## � Installation
 
-1. Run the initial deployment script:
-   ```bash
-   sudo chmod +x ./scripts/initial_deployment.sh
-   ./scripts/initial_deployment.sh
-   ```
-  
-2. Set up the environment variables in a [`.env`](.env) file based on the example in [`.env.example`](.env.example).
-   > The `AIRFLOW_UID` variable must be obtained by executing:
-    ```bash
-    echo $(id -u)
-    ```
-   > The `JWT_TOKEN` variable will be obtained later by using the Airflow API. Just leave it for now.
-
-#### Initialize Airflow and PostgreSQL (PgVector) containers
-
-1. Run the [`containers_deployment`](./scripts/containers_deployment) script :
-   ```bash
-   sudo chmod +x ./scripts/containers_deployment.sh
-   ./scripts/containers_deployment.sh
-   ```
-
-2. Export [`.env`](.env) variables :
-   ```bash
-   export $(grep -v '^#' .env | xargs)
-   ```
-
-3. Make sure to remove the PostgreSQL (PgVector) volume:
-   ```bash
-   docker compose down -v
-   ```
-   > ⚠️ This operation will delete all volumes ! 
-
-4. Use the Airflow API to obtain the `JWT_TOKEN` variable:
-   ```bash
-   curl -X 'POST' \
-   'http://localhost:8080/auth/token' \
-   -H 'Content-Type: application/json' \
-   -d "{\"username\": \"${_AIRFLOW_WWW_USER_USERNAME}\", \"password\": \"${_AIRFLOW_WWW_USER_PASSWORD}\"}"
-   ```
-
-5. Define the `JWT_TOKEN` variable in the [`.env`](.env) file with the obtained `access_token`.
-
-#### Optional : Configure Tchap logging 
-
-To receive real-time notifications about DAG execution (start, success, failure) in a Tchap room, you need to configure an Apprise connection in Airflow.
-> If you don't want to, you can just remove the following lines in each DAG located in [`airflow_config/dags/`](airflow_config/dags/) :
-
-      on_execute_callback=get_start_notifier(),
-      on_success_callback=get_success_notifier(),
-      on_failure_callback=get_failure_notifier(),
-
-Otherwise : 
-
-1.  Navigate to the Airflow UI (usually `http://localhost:8080`).
-2.  Go to **Admin > Connections**.
-3.  Click the **`+`** icon to add a new record.
-4.  Fill in the connection form with the following details:
-    *   **Connection Id**: `TchapNotifier`
-    *   **Connection Type**: `Apprise`
-    *   **Extra fields > config**: Construct the Apprise URL for Matrix using your environment variables, following this format:
-        ```
-        {"path": "matrixs://<TCHAP_ACCOUNT_TOKEN>@<TCHAP_SERVER>/<TCHAP_ROOM_TOKEN>/?format=markdown", "tag": "alerts"}
-        ```
-        -   Replace `<TCHAP_ACCOUNT_TOKEN>` with the value from your `.env` file.
-        -   Replace `<TCHAP_SERVER>` with the server hostname from your `.env` file (e.g., `matrix.agent.dinum.tchap.gouv.fr`, **without** the `https://` prefix).
-        -   Replace `<TCHAP_ROOM_TOKEN>` with the room ID from your `.env` file.
-
-5.  Click **Save**.
-
-Airflow will now use this connection to send formatted notifications to your specified Tchap room.
-
-#### Downloading, Processing and Uploading Data
-
-You are now ready to use Airflow and execute DAGs that are available.
-Each dataset has its own DAG and a [`DAG_Controller`](./airflow_config/dags/dag_controller.py) is defined to manage all datasets DAGs and their execution order.
-
-### </> Method 2 : Use local CLI
-
-#### Installing Dependencies
-
-1. Install the required apt dependencies:
-   ```bash
-   sudo apt-get update
-   sudo apt-get install -y $(cat config/requirements-apt-container.txt)
-   ```
-
-2. Create and activate a virtual environment:
-   ```bash
-   python3 -m venv .venv  # Create the virtual environment
-   source .venv/bin/activate  # Activate the virtual environment
-   ```
-
-3. Install the required python dependencies:
-   ```bash
-   pip install -e .
-   ```
-
-> Installing in development mode (`-e`) allows you to use the `mediatech` command and modify the code without reinstalling.
-
-> **Note:** Make sure your environment is properly configured before continuing.
-
-#### PostgreSQL (PgVector) Database Configuration
-
-1. Set up the environment variables in a [`.env`](.env) file based on the example in [`.env.example`](.env.example).
-
-2. Start the PostgreSQL container with Docker:
-   ```bash
-   docker compose up -d postgres
-   ```
-
-3. Check that the `pgvector_container` container is running:
-   ```bash
-   docker ps
-   ```
-
-#### Downloading, Processing and Uploading Data
-
-##### Using the `mediatech` Command
-
-After installation, the `mediatech` command is available globally and replaces `python main.py`:
-
-> If you encounter issues with the `mediatech` command, you can still use `python main.py` instead.
-
-The [`main.py`](main.py) file is the main entry point of the project and provides a command-line interface (CLI) to run each step of the pipeline separately.  
-You can use it as follows:
+### 1. Installer les dépendances
 
 ```bash
-mediatech <command> [options]
+make install
 ```
-or 
+
+Ou manuellement avec `uv` :
 
 ```bash
-python main.py <command> [options]
+uv sync --all-groups --dev
 ```
 
-Command examples:
-- View help:
-  ```bash
-  mediatech --help
-  ```
-- Create PostgreSQL tables:  
-  ```bash
-  mediatech create_tables --model BAAI/bge-m3
-  ```
-- Download all files listed in [`data_config.json`](config/data_config.json):  
-  ```bash
-  mediatech download_files --all
-  ```
-- Download files from the `service_public` source:  
-  ```bash
-  mediatech download_files --source service_public
-  ```
-- Download and process all files listed in [`data_config.json`](config/data_config.json):  
-  ```bash
-  mediatech download_and_process_files --all --model BAAI/bge-m3
-  ```
-- Process all data:  
-  ```bash
-  mediatech process_files --all --model BAAI/bge-m3
-  ```
-- Split a table into subtables based on different criteria (see [`main.py`](main.py)):  
-  ```bash
-  mediatech split_table --source legi
-  ```
-- Export PostgreSQL tables to parquet files:  
-  ```bash
-  mediatech export_tables --output data/parquet
-  ```
-- Upload parquet datasets to the Hugging Face repository:
-  ```bash
-  mediatech upload_dataset --input data/parquet/service_public.parquet --dataset-name service-public
-  ```
+### 2. Configuration
 
-
-Run `mediatech --help` in your terminal to see all available options, or check the code directly in [`main.py`](main.py).
-
-
-##### Alternative Usage with `python main.py`
-
-If you prefer to use the Python script directly, you can always use:
+Assure-toi d'avoir configuré ton token Hugging Face pour l'upload :
 
 ```bash
-python main.py <command> [options]
+huggingface-cli login
 ```
 
-Examples:
-```bash
-python main.py download_files
-python main.py create_tables --model BAAI/bge-m3
-python main.py process_files --all --model BAAI/bge-m3
-```
-##### Using the [`update.sh`](update.sh) Script
+## 📖 Usage
 
-The [`update.sh`](update.sh) script allows you to run the entire data processing pipeline: downloading, table creation, vectorization, and export.  
-To run it, execute the following command from the project root:
+### Pipeline complet
+
+Le pipeline se compose de deux étapes principales :
+
+#### 1. Téléchargement des données
 
 ```bash
-./scripts/update.sh
+PYTHONPATH=./ uv run scripts/download.py --download_name <dataset> [options]
 ```
 
-This script will:
-- Wait for the PostgreSQL database to be available,
-- Create or update the necessary tables in the PostgreSQL database,
-- Download public files listed in [`data_config.json`](config/data_config.json),
-- Process and vectorize the data,
-- Export the tables in Parquet format,
-- Upload the Parquet files to [Hugging Face](https://huggingface.co/AgentPublic).
+**Options disponibles :**
+- `--download_name` : Nom du dataset à télécharger (voir [config/data_config.json](config/data_config.json))
+- `--start_date` : Date de début au format YYYY-MM-DD (défaut: 2025-10-16)
+- `--end_date` : Date de fin au format YYYY-MM-DD (défaut: aujourd'hui)
+- `--max_download` : Nombre maximum de fichiers (-1 pour illimité)
 
-## 🗂️ Project Structure
+**Exemples :**
 
-- **[`main.py`](main.py)**: Main entry point to run the complete pipeline via CLI.
-- **[`pyproject.toml`](pyproject.toml)**: Python project and dependency configuration.
-- **[`Dockerfile`](Dockerfile)**: Defines the instructions to build the custom Docker image for Airflow, installing system dependencies, Python packages, and setting up the project environment.
-- **[`docker-compose.yml`](docker-compose.yml)**: Orchestrates the multi-container setup, defining Airflow services and the PostgreSQL (PgVector) database.
-- **[`.github/`](.github/)**: Contains GitHub Actions workflows for Continuous Integration and Continuous Deployment (CI/CD), automating testing and deployment processes.
-- **[`download_and_processing/`](download_and_processing/)**: Contains scripts to download and extract files.
-- **[`database/`](database/)**: Contains scripts to manage the database (table creation, data insertion).
-- **[`utils/`](utils/)**: Contains utility functions shared across modules.
-- **[`config/`](config/)**: Contains project configuration scripts.
-- **[`logs/`](logs/)**: Contains log files to track [scripts](scripts/) execution.
-- **[`scripts/`](scripts/)**: Contains all shell scripts, executed either automatically or manually in some cases.
-  - **[`scripts/update.sh`](scripts/update.sh)**: Shell script to run the entire data processing pipeline.
-  - **[`scripts/periodic_update.sh`](scripts/periodic_update.sh)**: Shell script to automate the pipeline on the virtual machine. This script is executed periodically by [`cron_config.txt`](cron_config.txt).
-  - **[`scripts/backup.sh`](scripts/backup.sh)**: Shell script to back up the Pgvector (PostgreSQL) volume and some configuration files. This script is executed periodically by [`cron_config.txt`](cron_config.txt).
-  - **[`scripts/restore.sh`](scripts/restore.sh)**: Shell script to restore the Pgvector (PostgreSQL) volume and configuration files if needed.
-  - **[`scripts/initial_deployment.sh`](scripts/initial_deployment.sh)**: Sets up a new server environment by installing Docker, Docker Compose, and other system dependencies.
-  - **[`scripts/containers_deployment.sh`](scripts/containers_deployment.sh)**:  Manages the application's lifecycle by building, initializing, and deploying the Docker containers as defined in [docker-compose.yml](docker-compose.yml). It must be executed after each update of the Mediatech CLI or other script not shared with the Airflow container, as defined in [docker-compose.yml](docker-compose.yml).
-  - **[`scripts/check_running_dags.sh`](scripts/check_running_dags.sh)**: Checks the Airflow API to see if any data pipelines (DAGs) are currently running, used to safely lock the deployment process.
-  - **[`scripts/delete_old_files.sh`](scripts/delete_old_files.sh)**: Shell script to automatically delete old files  from severals folders such as [logs/](logs/), [airflow_config/logs](airflow_config/logs) and [backups/](backups/). It keeps files from the last X days and deletes older ones. This script can be run manually or scheduled via cron to keep the folders clean.
-  - **[`scripts/write_tchap_message.sh`](scripts/write_tchap_message.sh)**: Sends a formatted message to a specified Tchap room. It takes the message content as an argument and uses environment variables for authentication and destination.
-- **[`airflow_config`](airflow_config/)**: Contains all files related to Apache Airflow, including DAG definitions (`dags/`), configuration (`config/`), logs (`logs/`), and plugins (`plugins/`). This is where the data orchestration pipelines are defined and managed.
+```bash
+# Télécharger LEGI depuis 2021
+PYTHONPATH=./ uv run scripts/download.py --download_name legi --start_date 2021-01-01
+
+# Télécharger CNIL pour la dernière semaine
+PYTHONPATH=./ uv run scripts/download.py --download_name cnil --start_date 2025-12-25
+
+# Télécharger DOLE
+PYTHONPATH=./ uv run scripts/download.py --download_name dole
+```
+
+#### 2. Extraction et export vers Hugging Face
+
+```bash
+PYTHONPATH=./ uv run scripts/extraction_and_export.py --download_name <dataset> --user-id hulk10 [options]
+```
+
+**Options disponibles :**
+- `--download_name` : Nom du dataset à extraire
+- `--user-id` : ID utilisateur Hugging Face (hulk10)
+- `--start_date` : Date de début (défaut: 2025-10-16)
+- `--end_date` : Date de fin (défaut: aujourd'hui)
+
+**Exemples :**
+
+```bash
+# Extraire et publier LEGI
+PYTHONPATH=./ uv run scripts/extraction_and_export.py --download_name legi --user-id hulk10
+
+# Extraire CNIL pour une période spécifique
+PYTHONPATH=./ uv run scripts/extraction_and_export.py \
+  --download_name cnil \
+  --user-id hulk10 \
+  --start_date 2025-01-01 \
+  --end_date 2025-12-31
+```
+
+### Datasets disponibles
+
+Les datasets configurés dans [config/data_config.json](config/data_config.json) incluent :
+
+- **legi** : Législation française (DILA)
+- **cnil** : Décisions de la CNIL
+- **constit** : Décisions du Conseil Constitutionnel
+- **dole** : Décisions du Journal Officiel
+- **service_public_pro** : Fiches Service-Public.fr Pro
+- **service_public_part** : Fiches Service-Public.fr Particuliers
+- **state_administrations_directory** : Annuaire des administrations d'État
+- **local_administrations_directory** : Annuaire des administrations locales
+- **data_gouv_datasets_catalog** : Catalogue des datasets data.gouv.fr
+- **travail_emploi** : Fiches Travail-Emploi
+
+## 🔄 Workflow type
+
+```bash
+# 1. Télécharger les données
+PYTHONPATH=./ uv run scripts/download.py --download_name legi --start_date 2024-01-01
+
+# 2. Extraire et publier sur Hugging Face
+PYTHONPATH=./ uv run scripts/extraction_and_export.py --download_name legi --user-id hulk10
+```
+
+Les données sont automatiquement :
+1. Téléchargées depuis les sources officielles
+2. Extraites et traitées
+3. Partitionnées en Parquet
+4. Publiées sur [https://huggingface.co/hulk10](https://huggingface.co/hulk10)
+
+## � Structure du projet
+
+```
+mediatech/
+├── scripts/
+│   ├── download.py                    # Téléchargement des archives
+│   └── extraction_and_export.py       # Extraction et export vers HF
+├── src/
+│   ├── download/                      # Modules de téléchargement
+│   ├── extraction/                    # Modules d'extraction
+│   ├── exports/                       # Modules d'export
+│   ├── process/                       # Modules de traitement
+│   └── utils/                         # Utilitaires
+├── config/
+│   └── data_config.json              # Configuration des sources
+├── data/
+│   ├── unprocessed/                  # Données brutes téléchargées
+│   ├── extracted/                    # Données extraites
+│   └── {dataset}/data/               # Parquets partitionnés
+├── Makefile                          # Commandes utilitaires
+└── pyproject.toml                    # Configuration Python
 
 ## ⚖️ License
 
-This project is licensed under the [MIT License](./LICENSE).
+Thi🛠️ Développement
+
+### Commandes utiles
+
+```bash
+# Installer les dépendances
+make install
+
+# Lancer les tests
+make run-test
+
+# Linter le code
+make lint
+
+# Nettoyer les caches
+make clean
+```
+
+### Ajouter un nouveau dataset
+
+1. Ajoute la configuration dans [config/data_config.json](config/data_config.json)
+2. Crée les modules de téléchargement, extraction et export nécessaires dans `src/`
+3. Teste avec les scripts
+
+## 🤗 Collection Hugging Face
+
+Les datasets sont publiés dans la collection :  
+**[https://huggingface.co/collections/hulk10/mediatech](https://huggingface.co/collections/hulk10/mediatech)**
+
+Chaque dataset est disponible au format Parquet partitionné par fichier source, facilitant l'accès incrémental et la mise à jour.
+
+## ⚖️ Licence
+
+Ce projet est sous licence [MIT License](./LICENSE).
+
+---
+
+**Maintenu par** : [hulk10](https://huggingface.co/hulk10)  
+**Collection** : [hulk10/mediatech](https://huggingface.co/collections/hulk10/mediatech)
