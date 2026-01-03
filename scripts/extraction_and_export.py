@@ -14,6 +14,7 @@ from src.exports.administrations_directory import (
 )
 from src.exports.data_gouv_datasets_catalog import DataGouvExporter
 from src.exports.travail_emploi import TravailEmploiExporter
+from src.exports.legi import LegiExporter
 from src.process.base import (
     LegiartiProcessor,
     CNILProcessor,
@@ -101,6 +102,7 @@ if __name__ == "__main__":
             )
             processor = LegiartiProcessor(input_folder=output_dir)
             ID_FIELD = "cid"
+            exporter = LegiExporter()
 
         elif download_name == "cnil":
             pattern_dates = [f"CNIL_{date}" for date in dates] + [
