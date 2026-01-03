@@ -13,15 +13,19 @@ class ConstitExporter(BaseExporter):
         print(f"Dataframe loaded with {len(df)} records.")
 
         repo_id = f"{user_id}/{dataset_name}-full-documents"
-        dataset_constit = load_dataset(repo_id, split="train")
-        dataset_constit_df = dataset_constit.to_pandas()
-        df: pd.DataFrame = pd.concat([df, dataset_constit_df]
-                                     ).drop_duplicates().reset_index(drop=True)
-
+        try:
+            dataset_constit = load_dataset(repo_id, split="train")
+            dataset_constit_df = dataset_constit.to_pandas()
+            df: pd.DataFrame = pd.concat([df, dataset_constit_df]
+                                         ).drop_duplicates().reset_index(drop=True)
+        except Exception as e:
+            print(e)
         dataset = Dataset.from_pandas(df)
         commit_message = f"Data update on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         dataset.push_to_hub(repo_id=repo_id, split="train", create_pr=False,
-                            num_proc=4, revision="main", commit_message=commit_message, max_shard_size="500MB")
+                            num_proc=kwargs.get("num_proc", 4), revision="main",
+                            commit_message=commit_message,
+                            max_shard_size=kwargs.get("max_shard_size", "64MB"))
         print(f"Uploaded dataset to Hugging Face Hub at {repo_id}.")
 
 
