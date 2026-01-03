@@ -26,6 +26,8 @@ jobs:
             local_administrations_directory,
             service_public_part,
             service_public_pro,
+            travail_emploi,
+            data_gouv_datasets_catalog,
           ]
       fail-fast: false
       max-parallel: 4

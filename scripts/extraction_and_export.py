@@ -3,6 +3,18 @@ from src.extraction.base import (
     DirectoryBaseExtractor,
 )
 from src.extraction.sheets import SheetsBaseExtractor
+from src.exports.base import BaseExporter
+from src.exports.cnil import CNILExporter
+from src.exports.constit import ConstitExporter
+from src.exports.dole import DoleExporter
+from src.exports.service_public import ServiceProExporter, ServiceParticulierExporter
+from src.exports.administrations_directory import (
+    StateAdministrationsDirectoryExporter,
+    LocalAdministrationsDirectoryExporter,
+)
+from src.exports.data_gouv_datasets_catalog import DataGouvExporter
+from src.exports.travail_emploi import TravailEmploiExporter
+from src.exports.legi import LegiExporter
 from src.process.base import (
     LegiartiProcessor,
     CNILProcessor,
@@ -64,15 +76,18 @@ if __name__ == "__main__":
     END_DATE = datetime.strptime(args.end_date, "%Y-%m-%d")
     user_id = args.user_id
     days = (END_DATE - START_DATE).days + 1
-    dates = [(START_DATE + timedelta(days=i)).strftime("%Y%m%d") for i in range(days)]
+    dates = [(START_DATE + timedelta(days=i)).strftime("%Y%m%d")
+             for i in range(days)]
     api = HfApi()
 
     if download_name not in CONFIG_LOADER:
-        raise ValueError(f"Download name '{download_name}' not found in configuration.")
+        raise ValueError(
+            f"Download name '{download_name}' not found in configuration.")
 
     config = CONFIG_LOADER[download_name]
     output_dir = f"data/extracted/{download_name}/"
     print(79 * "=")
+    exporter: BaseExporter = None
     if config.get("type") == "dila_folder":
         if download_name == "legi":
             pattern_dates = [f"LEGI_{date}" for date in dates] + [
@@ -87,6 +102,7 @@ if __name__ == "__main__":
             )
             processor = LegiartiProcessor(input_folder=output_dir)
             ID_FIELD = "cid"
+            exporter = LegiExporter()
 
         elif download_name == "cnil":
             pattern_dates = [f"CNIL_{date}" for date in dates] + [
@@ -101,6 +117,7 @@ if __name__ == "__main__":
             )
             processor = CNILProcessor(input_folder=output_dir)
             ID_FIELD = "doc_id"
+            exporter = CNILExporter()
 
         elif download_name == "constit":
             pattern_dates = [f"CONSTIT_{date}" for date in dates] + [
@@ -115,7 +132,7 @@ if __name__ == "__main__":
             )
             processor = ConstitProcessor(input_folder=output_dir)
             ID_FIELD = "cid"
-
+            exporter = ConstitExporter()
         elif download_name == "dole":
             pattern_dates = [f"DOLE_{date}" for date in dates] + [
                 f"Freemium_dole_global_{date}" for date in dates
@@ -129,6 +146,7 @@ if __name__ == "__main__":
             )
             processor = DOLEProcessor(input_folder=output_dir)
             ID_FIELD = "doc_id"
+            exporter = DoleExporter()
 
         obj = BaseExtractor(config, output_dir=output_dir)
         ext = ".xml"
@@ -139,6 +157,10 @@ if __name__ == "__main__":
         processor = DirectoryProcessor(input_folder=output_dir)
         ID_FIELD = "doc_id"
         output_dir = "./"
+        if download_name == "state_administrations_directory":
+            exporter = StateAdministrationsDirectoryExporter()
+        elif download_name == "local_administrations_directory":
+            exporter = LocalAdministrationsDirectoryExporter()
     elif config.get("type") == "sheets":
         ext = ".json"
         ID_FIELD = "pubId"
@@ -148,6 +170,12 @@ if __name__ == "__main__":
         obj = SheetsBaseExtractor(config, output_dir=output_dir, ext=ext)
         patterns = []
         processor = SheetsProcessor(input_folder=output_dir)
+        if download_name == "service_public_pro":
+            exporter = ServiceProExporter()
+        elif download_name == "service_public_part":
+            exporter = ServiceParticulierExporter()
+        elif download_name == "travail_emploi":
+            exporter = TravailEmploiExporter()
 
     elif config.get("type") == "data_gouv":
         from src.extraction.data_gouv import DataGouvBaseExtractor
@@ -158,6 +186,7 @@ if __name__ == "__main__":
         obj = DataGouvBaseExtractor(config, output_dir=output_dir, ext=ext)
         patterns = []
         processor = DataGouvProcessor(input_folder=output_dir)
+        exporter = DataGouvExporter()
 
     else:
         raise ValueError(
@@ -173,6 +202,8 @@ if __name__ == "__main__":
     print(f"Processor: {processor.__class__.__name__}")
     print(f"File extension to process: {ext}")
     print(f"{ID_FIELD} will be used as the unique identifier field.")
+    print(
+        f"Exporter: {exporter.__class__.__name__}" if exporter else "No exporter defined.")
 
     print(79 * "=")
     api.create_repo(
@@ -219,11 +250,4 @@ if __name__ == "__main__":
                     index=False,
                 )
                 data = []
-    if os.path.exists(output_df_path):
-        api.upload_large_folder(
-            folder_path=f"data/{download_name}/",
-            # path_in_repo=f"/data/{download_name}-full-documents.parquet/",
-            repo_id=f"{user_id}/{download_name}-full-documents",
-            repo_type="dataset",
-        )
-        print(f"Uploaded partition for {base_name} to Hugging Face Hub.")
+    exporter.process(user_id=user_id)
