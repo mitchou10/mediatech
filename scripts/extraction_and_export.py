@@ -148,10 +148,10 @@ if __name__ == "__main__":
             ID_FIELD = "doc_id"
             exporter = DoleExporter()
 
-        obj = BaseExtractor(config, output_dir=output_dir)
+        extractor = BaseExtractor(config, output_dir=output_dir)
         ext = ".xml"
     elif config.get("type") == "directory":
-        obj = DirectoryBaseExtractor(config, output_dir=output_dir)
+        extractor = DirectoryBaseExtractor(config, output_dir=output_dir)
         ext = ".json"
         patterns = []
         processor = DirectoryProcessor(input_folder=output_dir)
@@ -167,7 +167,7 @@ if __name__ == "__main__":
         if download_name in ["service_public_pro", "service_public_part"]:
             ext = ".xml"
             ID_FIELD = "sid"
-        obj = SheetsBaseExtractor(config, output_dir=output_dir, ext=ext)
+        extractor = SheetsBaseExtractor(config, output_dir=output_dir, ext=ext)
         patterns = []
         processor = SheetsProcessor(input_folder=output_dir)
         if download_name == "service_public_pro":
@@ -183,7 +183,8 @@ if __name__ == "__main__":
 
         ext = ".csv"
         ID_FIELD = "id"
-        obj = DataGouvBaseExtractor(config, output_dir=output_dir, ext=ext)
+        extractor = DataGouvBaseExtractor(
+            config, output_dir=output_dir, ext=ext)
         patterns = []
         processor = DataGouvProcessor(input_folder=output_dir)
         exporter = DataGouvExporter()
@@ -213,11 +214,11 @@ if __name__ == "__main__":
     )
 
     output_df_path = f"data/{download_name}/data/{download_name}_full_documents.parquet"
-    file_to_extracts = obj.filter_input_paths(patterns=patterns)
+    file_to_extracts = extractor.filter_input_paths(patterns=patterns)
     print(file_to_extracts)
     if len(file_to_extracts) == 0:
         print("No files to extract based on the given date range and patterns.")
-        return
+        exit(0)
 
     for file_to_extract in file_to_extracts:
         print(f"Extracting from {file_to_extract}")
@@ -228,7 +229,7 @@ if __name__ == "__main__":
         )
         print(f"Checking if {parquer_file_path} exists...")
         if not os.path.exists(parquer_file_path):
-            file_process = obj.extract(file_to_extract)
+            file_process = extractor.extract(file_to_extract)
             data = []
             if file_process:
                 for file in tqdm(file_process, desc="Processing files"):
