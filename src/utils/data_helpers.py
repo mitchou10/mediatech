@@ -50,7 +50,8 @@ def download_file(url: str, destination_path: str):
                     f"Downloaded file size: {file_size} bytes (content-length not provided by server)."
                 )
 
-        logger.info(f"Successfully downloaded {os.path.basename(destination_path)}")
+        logger.info(
+            f"Successfully downloaded {os.path.basename(destination_path)}")
     except Exception as e:
         logger.error(f"Failed to download {url}: {e}")
         raise e
@@ -84,7 +85,14 @@ def extract_tar_file(file_path: str, extract_path: str):
             files = [m.name for m in members if m.isfile()]
 
             logger.info(f"Extracting {len(files)} files from archive")
-            tar.extractall(path=extract_path, members=members)
-            extracted_files.extend(files)  # Ajouter les fichiers extraits à la liste
+
+            # Extraction avec barre de progression
+            with tqdm(total=len(members), unit="file", desc="Extracting", leave=True) as progress_bar:
+                for member in members:
+                    tar.extract(member, path=extract_path)
+                    progress_bar.update(1)
+
+            # Ajouter les fichiers extraits à la liste
+            extracted_files.extend(files)
 
     return extracted_files  # Retourner la liste des fichiers extraits
