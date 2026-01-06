@@ -14,7 +14,7 @@ from src.exports.administrations_directory import (
 )
 from src.exports.data_gouv_datasets_catalog import DataGouvExporter
 from src.exports.travail_emploi import TravailEmploiExporter
-from src.exports.legi import LegiExporter
+from src.exports.legi import LegiExporterStreaming
 from src.process.base import (
     LegiartiProcessor,
     CNILProcessor,
@@ -102,7 +102,7 @@ if __name__ == "__main__":
             )
             processor = LegiartiProcessor(input_folder=output_dir)
             ID_FIELD = "cid"
-            exporter = LegiExporter()
+            exporter = LegiExporterStreaming()
 
         elif download_name == "cnil":
             pattern_dates = [f"CNIL_{date}" for date in dates] + [
@@ -207,11 +207,13 @@ if __name__ == "__main__":
         f"Exporter: {exporter.__class__.__name__}" if exporter else "No exporter defined.")
 
     print(79 * "=")
-    api.create_repo(
+    repo_url = api.create_repo(
         repo_id=f"{user_id}/{download_name}-full-documents",
         repo_type="dataset",
         exist_ok=True,
     )
+    print(f"Repository URL: {repo_url}")
+    print(79*"*")
 
     output_df_path = f"data/{download_name}/data/{download_name}_full_documents.parquet"
     file_to_extracts = extractor.filter_input_paths(patterns=patterns)
@@ -231,10 +233,11 @@ if __name__ == "__main__":
         if not os.path.exists(parquer_file_path):
             file_process = extractor.extract(file_to_extract)
             data = []
+            batch_size = 1000  # Ajustez selon votre RAM disponible
+
             if file_process:
                 for file in tqdm(file_process, desc="Processing files"):
                     if file.endswith(ext):
-
                         result = processor.process(
                             file_path=os.path.join(output_dir, file)
                         )
@@ -243,15 +246,43 @@ if __name__ == "__main__":
                                 for item in result:
                                     item["source_file"] = base_name
                                 data.extend(result)
-
                             else:
-                                data.append(result)
                                 result["source_file"] = base_name
-            if data:
-                pd.DataFrame(data).to_parquet(
-                    output_df_path,
-                    partition_cols=["source_file"],
-                    index=False,
-                )
-                data = []
+                                data.append(result)
+
+                            # Écriture par batch pour éviter la surcharge mémoire
+                            if len(data) >= batch_size:
+                                df_batch = pd.DataFrame(data)
+                                if not os.path.exists(parquer_file_path):
+                                    # Première écriture - créer le fichier
+                                    df_batch.to_parquet(
+                                        output_df_path,
+                                        partition_cols=["source_file"],
+                                        index=False,
+                                    )
+                                else:
+                                    # Écriture en mode append
+                                    df_batch.to_parquet(
+                                        output_df_path,
+                                        partition_cols=["source_file"],
+                                        index=False,
+                                    )
+                                data = []  # Vider la liste après écriture
+
+                # Écrire les données restantes
+                if data:
+                    df_batch = pd.DataFrame(data)
+                    if not os.path.exists(parquer_file_path):
+                        df_batch.to_parquet(
+                            output_df_path,
+                            partition_cols=["source_file"],
+                            index=False,
+                        )
+                    else:
+                        df_batch.to_parquet(
+                            output_df_path,
+                            partition_cols=["source_file"],
+                            index=False,
+                        )
+                    data = []
     exporter.process(user_id=user_id)
