@@ -13,18 +13,16 @@ def get_content_file(path: str) -> str:
         return f.read()
 
 
-class ConseilDetat:
+class ConseilDadministratif:
     def __init__(
         self,
         config_loader: dict,
-        folder_download: str = "data/unprocessed/jurisprudence",
+        folder_download: str = "data/unprocessed/administrative_courts",
     ):
 
         self.config_loader = config_loader
         self.folder_download = folder_download
-        self.base_url = (
-            "https://opendata.justice-administrative.fr/DCE/YEAR/MONTH/CE_YEARMONTH.zip"
-        )
+        self.base_url = "https://opendata.justice-administrative.fr/DCA/YEAR/MONTH/CAA_YEARMONTH.zip"
 
     def get_urls(self) -> list[str]:
         return []
@@ -40,8 +38,9 @@ class ConseilDetat:
             sep=";",
             encoding="cp1252",
         )
-        # Nom du fichier .xml; N° de la décision;Date de lecture; Date de reversement; Nom du fichier .zip
-        column_to_filter = "Date de lecture"
+        # Nom_du_fichier__xml	Num_de_la_decision	Date_de_lecture	Date_de_reversement	Nom_du_fichier__zip
+
+        column_to_filter = "Date_de_lecture"
         df[column_to_filter] = pd.to_datetime(df[column_to_filter], format="%d/%m/%Y")
         filtered_df = df.loc[
             (df[column_to_filter] >= start_date) & (df[column_to_filter] < end_date)
@@ -53,8 +52,8 @@ class ConseilDetat:
         extracted_files = []
 
         for _, row in df.iterrows():
-            zip_file_name = row["Nom du fichier .zip"]
-            column_to_filter = "Date de lecture"
+            zip_file_name = row["Nom_du_fichier__zip"]
+            column_to_filter = "Date_de_lecture"
             zip_file_url = self.base_url.replace(
                 "YEAR", f"{row[column_to_filter].year}"
             ).replace("MONTH", f"{row[column_to_filter].month:02d}")
@@ -65,7 +64,7 @@ class ConseilDetat:
 
             with ZipFile(zip_file_path, "r") as zip_ref:
                 zip_ref.extractall(self.folder_download)
-                xml_file = f"{self.folder_download}/{row['Nom du fichier .xml']}"
+                xml_file = f"{self.folder_download}/{row['Nom_du_fichier__xml']}"
                 extracted_files.append(xml_file)
 
         df["path_xml"] = extracted_files
@@ -102,9 +101,9 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    obj = ConseilDetat(
+    obj = ConseilDadministratif(
         config_loader={
-            "download_url": "https://opendata.justice-administrative.fr/DCE/CE_documents_reverses.csv"
+            "download_url": "https://opendata.justice-administrative.fr/DCA/CAA_documents_reverses.csv"
         }
     )
     print(79 * "*")
@@ -116,7 +115,7 @@ if __name__ == "__main__":
     df = obj.download_zip_and_extract(filter)
     user_id = parse_args().user_id
     api = HfApi()
-    repo_id = f"{user_id}/conseil-detat-full-documents"
+    repo_id = f"{user_id}/conseil-administratives-appel-full-documents"
     repo_url = api.create_repo(
         repo_id=repo_id,
         repo_type="dataset",

@@ -13,17 +13,17 @@ def get_content_file(path: str) -> str:
         return f.read()
 
 
-class ConseilDetat:
+class ConseilDadministratif:
     def __init__(
         self,
         config_loader: dict,
-        folder_download: str = "data/unprocessed/jurisprudence",
+        folder_download: str = "data/unprocessed/tribunal_administratif",
     ):
 
         self.config_loader = config_loader
         self.folder_download = folder_download
         self.base_url = (
-            "https://opendata.justice-administrative.fr/DCE/YEAR/MONTH/CE_YEARMONTH.zip"
+            "https://opendata.justice-administrative.fr/DTA/YEAR/MONTH/TA_YEARMONTH.zip"
         )
 
     def get_urls(self) -> list[str]:
@@ -35,12 +35,9 @@ class ConseilDetat:
         end_date: datetime,
     ) -> pd.DataFrame:
         url = self.config_loader["download_url"]
-        df = pd.read_csv(
-            url,
-            sep=";",
-            encoding="cp1252",
-        )
-        # Nom du fichier .xml; N° de la décision;Date de lecture; Date de reversement; Nom du fichier .zip
+        df = pd.read_csv(url, sep=";", encoding="cp1252", on_bad_lines="skip")
+        # Nom du fichier .xml	N° de la décision	Date de lecture	Date de reversement	Nom du fichier .zip	Juridiction
+
         column_to_filter = "Date de lecture"
         df[column_to_filter] = pd.to_datetime(df[column_to_filter], format="%d/%m/%Y")
         filtered_df = df.loc[
@@ -102,9 +99,9 @@ def parse_args():
 
 
 if __name__ == "__main__":
-    obj = ConseilDetat(
+    obj = ConseilDadministratif(
         config_loader={
-            "download_url": "https://opendata.justice-administrative.fr/DCE/CE_documents_reverses.csv"
+            "download_url": "https://opendata.justice-administrative.fr/DTA/TA_documents_reverses.csv"
         }
     )
     print(79 * "*")
@@ -116,7 +113,7 @@ if __name__ == "__main__":
     df = obj.download_zip_and_extract(filter)
     user_id = parse_args().user_id
     api = HfApi()
-    repo_id = f"{user_id}/conseil-detat-full-documents"
+    repo_id = f"{user_id}/conseil-administratives-appel-full-documents"
     repo_url = api.create_repo(
         repo_id=repo_id,
         repo_type="dataset",
