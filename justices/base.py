@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import logging
 import sys
+import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
@@ -76,7 +77,9 @@ class BaseJustice:
     def _build_xml_path(self, name: str) -> str:
         return f"{self.folder_download}/{name}"
 
-    def download_zip_and_extract(self, df: pd.DataFrame, max_workers: int = 4) -> pd.DataFrame:
+    def download_zip_and_extract(
+        self, df: pd.DataFrame, max_workers: int = 4
+    ) -> pd.DataFrame:
         # Dédoublonne les zips à télécharger (plusieurs XML peuvent être dans le même zip)
         zip_tasks: dict[str, str] = {}
         for _, row in df.iterrows():
@@ -122,32 +125,20 @@ class BaseJustice:
 
         new_df = self.download_zip_and_extract(new_rows)
 
-        try:
-            existing_ds = load_dataset(repo_id, split="train")
-            existing_df = pd.DataFrame(existing_ds.to_pandas())
+        n_before = len(new_df)
+        new_df = new_df.drop_duplicates(subset=["content_hash"]).reset_index(drop=True)
+        if len(new_df) < n_before:
+            print(f"Removed {n_before - len(new_df)} duplicate(s) by content hash.")
 
-            # Ajoute la colonne hash aux anciennes données si absente
-            if "content_hash" not in existing_df.columns:
-                existing_df["content_hash"] = existing_df["content"].apply(compute_hash)
-
-            full_df = pd.concat([existing_df, new_df], ignore_index=True)
-
-            if full_df.duplicated(subset=["content_hash"]).any():
-                n_before = len(full_df)
-                full_df = full_df.drop_duplicates(subset=["content_hash"]).reset_index(drop=True)
-                print(f"Removed {n_before - len(full_df)} duplicate(s) by content hash.")
-
-            dataset = Dataset.from_pandas(full_df)
-        except Exception:
-            dataset = Dataset.from_pandas(new_df)
-
+        dataset = Dataset.from_pandas(new_df, preserve_index=False)
+        shard_name = f"data/train-{datetime.now().strftime('%Y%m%d%H%M%S')}.parquet"
         commit_message = f"Data update on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (+{len(new_df)} documents)"
-        dataset.push_to_hub(
-            repo_id=repo_id,
-            split="train",
-            create_pr=False,
-            num_proc=8,
-            revision="main",
-            commit_message=commit_message,
-            max_shard_size="500MB",
-        )
+        with tempfile.NamedTemporaryFile(suffix=".parquet", delete=False) as tmp:
+            dataset.to_parquet(tmp.name)
+            api.upload_file(
+                path_or_fileobj=tmp.name,
+                path_in_repo=shard_name,
+                repo_id=repo_id,
+                repo_type="dataset",
+                commit_message=commit_message,
+            )

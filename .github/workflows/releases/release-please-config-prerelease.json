@@ -2,10 +2,11 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "packages": {
     ".": {
-      "release-type": "python",
+      "release-type": "simple",
       "prerelease": true,
       "prerelease-type": "rc",
-      "versioning": "prerelease"
+      "versioning": "prerelease",
+      "version-file": "pyproject.toml"
     }
   }
 }
