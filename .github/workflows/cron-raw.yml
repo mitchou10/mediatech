@@ -1,0 +1,38 @@
+name: Daily Raw Dataset Build
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  raw-dataset:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        download_name: [legi, cnil, constit, dole]
+      fail-fast: false
+      max-parallel: 4
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Build raw dataset for ${{ matrix.download_name }}
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          PYTHONPATH=$(pwd) uv run scripts/raw_dataset.py \
+            --download-name ${{ matrix.download_name }} \
+            --user-id ${{ secrets.HF_USER_ID }}
