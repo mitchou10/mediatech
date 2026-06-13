@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import logging
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from zipfile import ZipFile
@@ -66,21 +67,37 @@ class BaseJustice:
         df[self.date_col] = pd.to_datetime(df[self.date_col], format="%d/%m/%Y")
         return df
 
-    def download_zip_and_extract(self, df: pd.DataFrame) -> pd.DataFrame:
-        extracted_files = []
+    def _download_and_extract_zip(self, zip_url: str, zip_path: str) -> None:
+        if not Path(zip_path).exists():
+            download_file(url=zip_url, destination_path=zip_path)
+        with ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(self.folder_download)
+
+    def _build_xml_path(self, name: str) -> str:
+        return f"{self.folder_download}/{name}"
+
+    def download_zip_and_extract(self, df: pd.DataFrame, max_workers: int = 4) -> pd.DataFrame:
+        # Dédoublonne les zips à télécharger (plusieurs XML peuvent être dans le même zip)
+        zip_tasks: dict[str, str] = {}
         for _, row in df.iterrows():
-            zip_file_url = self.base_url.replace(
+            zip_url = self.base_url.replace(
                 "YEAR", str(row[self.date_col].year)
             ).replace("MONTH", f"{row[self.date_col].month:02d}")
-            zip_file_path = f"{self.folder_download}/{row[self.filename_zip_col]}"
-            if not Path(zip_file_path).exists():
-                download_file(url=zip_file_url, destination_path=zip_file_path)
-            with ZipFile(zip_file_path, "r") as zip_ref:
-                zip_ref.extractall(self.folder_download)
-            extracted_files.append(f"{self.folder_download}/{row[self.filename_xml_col]}")
+            zip_path = f"{self.folder_download}/{row[self.filename_zip_col]}"
+            zip_tasks[zip_path] = zip_url
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(self._download_and_extract_zip, url, path): path
+                for path, url in zip_tasks.items()
+            }
+            for future in as_completed(futures):
+                future.result()  # propage les exceptions
 
         df = df.copy()
-        df["path_xml"] = extracted_files
+        df["path_xml"] = df[self.filename_xml_col].apply(
+            lambda name: self._build_xml_path(name)
+        )
         df["content"] = df["path_xml"].apply(get_content_file)
         df["content_hash"] = df["content"].apply(compute_hash)
         return df
