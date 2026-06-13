@@ -1,4 +1,5 @@
 import argparse
+import hashlib
 import logging
 import sys
 from datetime import datetime
@@ -6,7 +7,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import pandas as pd
-from datasets import Dataset, concatenate_datasets, load_dataset
+from datasets import Dataset, load_dataset
 from huggingface_hub import HfApi
 
 from justices.utils import download_file
@@ -17,6 +18,10 @@ logger = logging.getLogger(__name__)
 def get_content_file(path: str) -> str:
     with open(path, "r") as f:
         return f.read()
+
+
+def compute_hash(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8", errors="replace")).hexdigest()
 
 
 def get_existing_filenames(repo_id: str, filename_col: str) -> set[str]:
@@ -30,18 +35,6 @@ def get_existing_filenames(repo_id: str, filename_col: str) -> set[str]:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Extract and export data based on configuration."
-    )
-    parser.add_argument(
-        "--start_date",
-        type=str,
-        default="2025-10-16",
-        help="Start date for the extraction in YYYY-MM-DD format.",
-    )
-    parser.add_argument(
-        "--end_date",
-        type=str,
-        default=datetime.now().strftime("%Y-%m-%d"),
-        help="End date for the extraction in YYYY-MM-DD format.",
     )
     parser.add_argument(
         "--user-id",
@@ -63,7 +56,7 @@ class BaseJustice:
         self.folder_download = folder_download
         self.base_url = base_url
 
-    def filter_data(self, start_date: datetime, end_date: datetime) -> pd.DataFrame:
+    def load_data(self) -> pd.DataFrame:
         df = pd.read_csv(
             self.config_loader["download_url"],
             sep=";",
@@ -71,9 +64,7 @@ class BaseJustice:
             on_bad_lines=self.on_bad_lines,
         )
         df[self.date_col] = pd.to_datetime(df[self.date_col], format="%d/%m/%Y")
-        return df.loc[
-            (df[self.date_col] >= start_date) & (df[self.date_col] < end_date)
-        ]
+        return df
 
     def download_zip_and_extract(self, df: pd.DataFrame) -> pd.DataFrame:
         extracted_files = []
@@ -91,9 +82,10 @@ class BaseJustice:
         df = df.copy()
         df["path_xml"] = extracted_files
         df["content"] = df["path_xml"].apply(get_content_file)
+        df["content_hash"] = df["content"].apply(compute_hash)
         return df
 
-    def run(self, start_date: datetime, end_date: datetime, repo_id: str) -> None:
+    def run(self, repo_id: str) -> None:
         api = HfApi()
         repo_url = api.create_repo(repo_id=repo_id, repo_type="dataset", exist_ok=True)
         print(f"Repository URL: {repo_url}")
@@ -101,8 +93,9 @@ class BaseJustice:
         existing_filenames = get_existing_filenames(repo_id, self.filename_xml_col)
         print(f"Already in HuggingFace: {len(existing_filenames)} documents")
 
-        filtered = self.filter_data(start_date=start_date, end_date=end_date)
-        new_rows = filtered[~filtered[self.filename_xml_col].isin(existing_filenames)]
+        all_data = self.load_data()
+        new_rows = all_data[~all_data[self.filename_xml_col].isin(existing_filenames)]
+        new_rows = new_rows.drop_duplicates(subset=[self.filename_xml_col])
         print(f"New documents to process: {len(new_rows)}")
         print(79 * "*")
 
@@ -114,7 +107,20 @@ class BaseJustice:
 
         try:
             existing_ds = load_dataset(repo_id, split="train")
-            dataset = concatenate_datasets([existing_ds, Dataset.from_pandas(new_df)])
+            existing_df = pd.DataFrame(existing_ds.to_pandas())
+
+            # Ajoute la colonne hash aux anciennes données si absente
+            if "content_hash" not in existing_df.columns:
+                existing_df["content_hash"] = existing_df["content"].apply(compute_hash)
+
+            full_df = pd.concat([existing_df, new_df], ignore_index=True)
+
+            if full_df.duplicated(subset=["content_hash"]).any():
+                n_before = len(full_df)
+                full_df = full_df.drop_duplicates(subset=["content_hash"]).reset_index(drop=True)
+                print(f"Removed {n_before - len(full_df)} duplicate(s) by content hash.")
+
+            dataset = Dataset.from_pandas(full_df)
         except Exception:
             dataset = Dataset.from_pandas(new_df)
 

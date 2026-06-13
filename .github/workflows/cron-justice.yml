@@ -4,12 +4,6 @@ on:
     schedule:
         - cron: "0 2 * * *"
     workflow_dispatch:
-        inputs:
-            days_ago:
-                description: "Number of days ago to start from (default: 1 for yesterday)"
-                required: false
-                default: "1"
-                type: string
 
 jobs:
     extract-conseil-detat:
@@ -28,15 +22,13 @@ jobs:
 
             - name: Install dependencies
               run: uv sync --dev
+
             - name: Run extraction for conseil d'état
               env:
                   HF_TOKEN: ${{ secrets.HF_TOKEN }}
               run: |
-                  DAYS_AGO=${{ github.event.inputs.days_ago || '1' }}
                   PYTHONPATH=$(pwd) uv run justices/conseil_detat.py \
-                    --user-id ${{ secrets.HF_USER_ID }} \
-                    --start_date $(date -d "$DAYS_AGO days ago" +%Y-%m-%d) \
-                    --end_date $(date +%Y-%m-%d)
+                    --user-id ${{ secrets.HF_USER_ID }}
 
     extract-conseil-administratif:
         runs-on: ubuntu-latest
@@ -54,15 +46,13 @@ jobs:
 
             - name: Install dependencies
               run: uv sync --dev
-            - name: Run extraction for conseil d'état
+
+            - name: Run extraction for conseil administratif d'appel
               env:
                   HF_TOKEN: ${{ secrets.HF_TOKEN }}
               run: |
-                  DAYS_AGO=${{ github.event.inputs.days_ago || '1' }}
                   PYTHONPATH=$(pwd) uv run justices/conseil_administratif.py \
-                    --user-id ${{ secrets.HF_USER_ID }} \
-                    --start_date $(date -d "$DAYS_AGO days ago" +%Y-%m-%d) \
-                    --end_date $(date +%Y-%m-%d)
+                    --user-id ${{ secrets.HF_USER_ID }}
 
     extract-tribunal:
         runs-on: ubuntu-latest
@@ -80,12 +70,10 @@ jobs:
 
             - name: Install dependencies
               run: uv sync --dev
-            - name: Run extraction for conseil d'état
+
+            - name: Run extraction for tribunal administratif
               env:
                   HF_TOKEN: ${{ secrets.HF_TOKEN }}
               run: |
-                  DAYS_AGO=${{ github.event.inputs.days_ago || '1' }}
                   PYTHONPATH=$(pwd) uv run justices/tribunal_adminstratif.py \
-                    --user-id ${{ secrets.HF_USER_ID }} \
-                    --start_date $(date -d "$DAYS_AGO days ago" +%Y-%m-%d) \
-                    --end_date $(date +%Y-%m-%d)
+                    --user-id ${{ secrets.HF_USER_ID }}
