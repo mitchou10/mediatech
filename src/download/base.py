@@ -21,8 +21,17 @@ class BaseDownloader(ABC):
     @abstractmethod
     def filter_urls(self, patterns: list[re.Pattern]) -> list[str]: ...
 
-    def download(self, url: str, destination_path: str):
-        download_file(url, destination_path)
+    def download(self, url: str, destination_path: str, max_retries: int = 3):
+        for attempt in range(1, max_retries + 1):
+            try:
+                download_file(url, destination_path)
+                return
+            except Exception as e:
+                if attempt == max_retries:
+                    raise
+                logger.warning(
+                    f"Download attempt {attempt}/{max_retries} failed for {url}: {e}. Retrying…"
+                )
         
         
     def download_all(self, max_download: int = -1, patterns: list[re.Pattern] = []):
