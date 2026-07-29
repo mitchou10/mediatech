@@ -42,8 +42,9 @@ def download_file(url: str, destination_path: str):
             # Check file size after download to verify completeness
             file_size = os.path.getsize(destination_path)
             if total_size > 0 and file_size != total_size:
-                logger.warning(
-                    f"Downloaded file size {file_size} bytes does not match expected {total_size} bytes. File may be incomplete."
+                os.remove(destination_path)
+                raise IOError(
+                    f"Downloaded file size {file_size} bytes does not match expected {total_size} bytes. File is incomplete."
                 )
             elif total_size == 0:
                 logger.info(
