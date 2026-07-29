@@ -33,7 +33,7 @@ with open("config/data_config.json", "r") as f:
 # commit per archive quickly hits HuggingFace's commit rate limit (128/hour).
 # Instead, shards are written to local parquet files as archives are read,
 # and flushed together as a single commit every ARCHIVES_PER_COMMIT archives.
-ARCHIVES_PER_COMMIT = 20
+ARCHIVES_PER_COMMIT = 2
 
 
 def parse_args() -> argparse.Namespace:
@@ -124,7 +124,11 @@ def is_valid_archive(archive_path: Path) -> bool:
     """Check an archive can be fully read, to detect truncated downloads."""
     name = archive_path.name
     try:
-        if name.endswith(".tar.gz") or name.endswith(".tar.bz2") or name.endswith(".tar"):
+        if (
+            name.endswith(".tar.gz")
+            or name.endswith(".tar.bz2")
+            or name.endswith(".tar")
+        ):
             with tarfile.open(archive_path, "r:*") as tf:
                 for member in tf:
                     if member.isfile():
@@ -156,7 +160,9 @@ def write_shard(rows: list[dict]) -> tuple[str, str]:
     return tmp_path, shard_name
 
 
-def commit_with_retry(api: HfApi, repo_id: str, operations: list, commit_message: str) -> None:
+def commit_with_retry(
+    api: HfApi, repo_id: str, operations: list, commit_message: str
+) -> None:
     while True:
         try:
             api.create_commit(
@@ -175,7 +181,9 @@ def commit_with_retry(api: HfApi, repo_id: str, operations: list, commit_message
             raise
 
 
-def flush_shards(repo_id: str, shards: list[tuple[str, str]], n_archives: int, api: HfApi) -> None:
+def flush_shards(
+    repo_id: str, shards: list[tuple[str, str]], n_archives: int, api: HfApi
+) -> None:
     if not shards:
         return
     try:
@@ -184,11 +192,59 @@ def flush_shards(repo_id: str, shards: list[tuple[str, str]], n_archives: int, a
             for tmp_path, shard_name in shards
         ]
         commit_with_retry(
-            api, repo_id, operations, f"Add {n_archives} archive(s) ({len(shards)} shard(s))"
+            api,
+            repo_id,
+            operations,
+            f"Add {n_archives} archive(s) ({len(shards)} shard(s))",
         )
     finally:
         for tmp_path, _ in shards:
             os.remove(tmp_path)
+
+
+def download_batch(batch_urls: list[str], folder: Path, downloader) -> None:
+    def _download(url: str) -> None:
+        dest = folder / Path(url).name
+        if dest.exists() and not is_valid_archive(dest):
+            print(f"    {dest.name} is corrupted/incomplete, re-downloading …")
+            dest.unlink()
+        if not dest.exists():
+            print(f"    Downloading {dest.name} …")
+            downloader.download(url=url, destination_path=str(dest))
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {executor.submit(_download, url): url for url in batch_urls}
+        for future in as_completed(futures):
+            url = futures[future]
+            try:
+                future.result()
+            except Exception as e:
+                print(f"    [SKIP] download failed for {Path(url).name}: {e}")
+
+
+def read_and_push_batch(
+    batch_urls: list[str], folder: Path, repo_id: str, api: HfApi
+) -> None:
+    batch_archives = [
+        (folder / Path(u).name, u)
+        for u in batch_urls
+        if (folder / Path(u).name).exists()
+    ]
+
+    pending_shards: list[tuple[str, str]] = []
+    pending_archive_count = 0
+    for archive_path, source_url in batch_archives:
+        print(f"    Reading {archive_path.name} …")
+        rows = read_archive(archive_path, source_url)
+        if rows:
+            pending_shards.append(write_shard(rows))
+            pending_archive_count += 1
+            del rows
+        archive_path.unlink(missing_ok=True)
+
+    if pending_shards:
+        flush_shards(repo_id, pending_shards, pending_archive_count, api)
+        print(f"    Pushed {pending_archive_count} archive(s) to {repo_id}")
 
 
 def process_source(download_name: str, config: dict, user_id: str, api: HfApi) -> None:
@@ -201,61 +257,32 @@ def process_source(download_name: str, config: dict, user_id: str, api: HfApi) -
     uploaded = get_uploaded_archives(repo_id)
     print(f"  Already uploaded archives: {len(uploaded)}")
 
-    # -- Download missing archives ------------------------------------------
     from scripts.download_factory import factory_download
 
     downloader = factory_download(config, str(folder))
     all_urls: list[str] = downloader.get_urls()
 
     new_urls = [u for u in all_urls if Path(u).name not in uploaded]
-    print(f"  Archives to download: {len(new_urls)} / {len(all_urls)} total")
+    print(f"  Archives to process: {len(new_urls)} / {len(all_urls)} total")
 
-    def _download(url: str) -> None:
-        dest = folder / Path(url).name
-        if dest.exists() and not is_valid_archive(dest):
-            print(f"    {dest.name} is corrupted/incomplete, re-downloading …")
-            dest.unlink()
-        if not dest.exists():
-            print(f"    Downloading {dest.name} …")
-            downloader.download(url=url, destination_path=str(dest))
-
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {executor.submit(_download, url): url for url in new_urls}
-        for future in as_completed(futures):
-            url = futures[future]
-            try:
-                future.result()
-            except Exception as e:
-                print(f"    [SKIP] download failed for {Path(url).name}: {e}")
-
-    # -- Read archives and push ----------------------------------------------
-    new_archives = [
-        (folder / Path(u).name, u) for u in new_urls if (folder / Path(u).name).exists()
-    ]
-
-    if not new_archives:
+    if not new_urls:
         print("  Nothing new to push.")
         return
 
-    pending_shards: list[tuple[str, str]] = []
-    pending_archive_count = 0
-    for archive_path, source_url in new_archives:
-        print(f"    Reading {archive_path.name} …")
-        rows = read_archive(archive_path, source_url)
-        if rows:
-            pending_shards.append(write_shard(rows))
-            pending_archive_count += 1
-            del rows
-        archive_path.unlink(missing_ok=True)
+    # Process in batches of ARCHIVES_PER_COMMIT: download only that batch,
+    # read + push it, delete its local archives, then move to the next batch.
+    # Bounds both disk usage (only one batch of archives on disk at a time)
+    # and HF commits (one commit per batch instead of one per archive).
+    n_batches = (len(new_urls) + ARCHIVES_PER_COMMIT - 1) // ARCHIVES_PER_COMMIT
+    for batch_start in range(0, len(new_urls), ARCHIVES_PER_COMMIT):
+        batch_urls = new_urls[batch_start : batch_start + ARCHIVES_PER_COMMIT]
+        batch_num = batch_start // ARCHIVES_PER_COMMIT + 1
+        print(
+            f"  Batch {batch_num}/{n_batches}: downloading {len(batch_urls)} archive(s) …"
+        )
 
-        if pending_archive_count >= ARCHIVES_PER_COMMIT:
-            flush_shards(repo_id, pending_shards, pending_archive_count, api)
-            print(f"    Pushed {pending_archive_count} archive(s) to {repo_id}")
-            pending_shards, pending_archive_count = [], 0
-
-    if pending_shards:
-        flush_shards(repo_id, pending_shards, pending_archive_count, api)
-        print(f"    Pushed {pending_archive_count} archive(s) to {repo_id}")
+        download_batch(batch_urls, folder, downloader)
+        read_and_push_batch(batch_urls, folder, repo_id, api)
 
 
 def main() -> None:
