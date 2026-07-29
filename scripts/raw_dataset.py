@@ -13,7 +13,9 @@ For each download_name (or all if omitted):
 
 import argparse
 import json
+import logging
 import os
+import sys
 import tarfile
 import tempfile
 import time
@@ -25,6 +27,13 @@ import pandas as pd
 from datasets import Dataset, load_dataset
 from huggingface_hub import CommitOperationAdd, HfApi
 from huggingface_hub.utils import HfHubHTTPError
+
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+try:
+    sys.stdout.reconfigure(line_buffering=True)  # type: ignore[union-attr]
+except AttributeError:
+    pass
 
 with open("config/data_config.json", "r") as f:
     CONFIG_LOADER = json.load(f)
@@ -205,12 +214,15 @@ def flush_shards(
 def download_batch(batch_urls: list[str], folder: Path, downloader) -> None:
     def _download(url: str) -> None:
         dest = folder / Path(url).name
-        if dest.exists() and not is_valid_archive(dest):
-            print(f"    {dest.name} is corrupted/incomplete, re-downloading …")
-            dest.unlink()
+        if dest.exists():
+            print(f"    Checking existing {dest.name} …")
+            if not is_valid_archive(dest):
+                print(f"    {dest.name} is corrupted/incomplete, re-downloading …")
+                dest.unlink()
         if not dest.exists():
             print(f"    Downloading {dest.name} …")
             downloader.download(url=url, destination_path=str(dest))
+            print(f"    Downloaded {dest.name}")
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = {executor.submit(_download, url): url for url in batch_urls}
@@ -236,6 +248,7 @@ def read_and_push_batch(
     for archive_path, source_url in batch_archives:
         print(f"    Reading {archive_path.name} …")
         rows = read_archive(archive_path, source_url)
+        print(f"    Read {len(rows)} file(s) from {archive_path.name}")
         if rows:
             pending_shards.append(write_shard(rows))
             pending_archive_count += 1
