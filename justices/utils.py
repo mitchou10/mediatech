@@ -23,6 +23,7 @@ def download_file(url: str, destination_path: str):
         with requests.get(url, stream=True) as r:
             r.raise_for_status()
             total_size = int(r.headers.get("content-length", 0))
+            content_encoding = r.headers.get("content-encoding")
             block_size = 1024 * 1024  # 1 MB
 
             logger.debug(f"Saving to {destination_path}")
@@ -39,9 +40,18 @@ def download_file(url: str, destination_path: str):
                             progress_bar.update(len(chunk))
                             f.write(chunk)
 
-            # Check file size after download to verify completeness
+            # Check file size after download to verify completeness. Skip the
+            # check when the response is transfer-compressed (e.g. GitHub raw
+            # URLs served with Content-Encoding: gzip): Content-Length then
+            # reflects the compressed size, while `requests` transparently
+            # decompresses the body, so the saved file is legitimately larger.
             file_size = os.path.getsize(destination_path)
-            if total_size > 0 and file_size != total_size:
+            if content_encoding:
+                logger.info(
+                    f"Downloaded file size: {file_size} bytes (content-encoding={content_encoding}, "
+                    f"content-length {total_size} bytes is the compressed size; skipping size check)."
+                )
+            elif total_size > 0 and file_size != total_size:
                 logger.warning(
                     f"Downloaded file size {file_size} bytes does not match expected {total_size} bytes. File may be incomplete."
                 )
