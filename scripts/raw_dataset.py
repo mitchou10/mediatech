@@ -44,6 +44,13 @@ with open("config/data_config.json", "r") as f:
 # and flushed together as a single commit every ARCHIVES_PER_COMMIT archives.
 ARCHIVES_PER_COMMIT = 2
 
+# Archive contents are streamed row-by-row (not loaded fully into memory).
+# A shard is flushed to disk every CHUNK_ROWS rows, regardless of archive
+# boundaries, so that huge archives (e.g. the full "Freemium_legi_global"
+# LEGI snapshot, ~1GB compressed / tens of GB uncompressed) cannot blow up
+# memory the way loading a whole archive into one list/DataFrame would.
+CHUNK_ROWS = 5000
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Build raw HF datasets from archives.")
@@ -68,11 +75,11 @@ def get_uploaded_archives(repo_id: str) -> set[str]:
         return set()
 
 
-def read_tar(archive_path: Path, source_url: str) -> list[dict]:
-    rows = []
+def read_tar(archive_path: Path, source_url: str):
+    """Yield rows one at a time so callers can bound memory usage."""
     try:
         with tarfile.open(archive_path, "r:*") as tf:
-            for member in tf.getmembers():
+            for member in tf:
                 if not member.isfile():
                     continue
                 try:
@@ -82,21 +89,18 @@ def read_tar(archive_path: Path, source_url: str) -> list[dict]:
                     content = f.read().decode("utf-8", errors="replace")
                 except Exception as e:
                     content = f"<read error: {e}>"
-                rows.append(
-                    {
-                        "source_url": source_url,
-                        "source_zip": archive_path.name,
-                        "source_file": member.name,
-                        "content": content,
-                    }
-                )
+                yield {
+                    "source_url": source_url,
+                    "source_zip": archive_path.name,
+                    "source_file": member.name,
+                    "content": content,
+                }
     except Exception as e:
         print(f"  [SKIP] cannot open tar {archive_path.name}: {e}")
-    return rows
 
 
-def read_zip(archive_path: Path, source_url: str) -> list[dict]:
-    rows = []
+def read_zip(archive_path: Path, source_url: str):
+    """Yield rows one at a time so callers can bound memory usage."""
     try:
         with zipfile.ZipFile(archive_path, "r") as zf:
             for member in zf.infolist():
@@ -106,27 +110,26 @@ def read_zip(archive_path: Path, source_url: str) -> list[dict]:
                     content = zf.read(member.filename).decode("utf-8", errors="replace")
                 except Exception as e:
                     content = f"<read error: {e}>"
-                rows.append(
-                    {
-                        "source_url": source_url,
-                        "source_zip": archive_path.name,
-                        "source_file": member.filename,
-                        "content": content,
-                    }
-                )
+                yield {
+                    "source_url": source_url,
+                    "source_zip": archive_path.name,
+                    "source_file": member.filename,
+                    "content": content,
+                }
     except Exception as e:
         print(f"  [SKIP] cannot open zip {archive_path.name}: {e}")
-    return rows
 
 
-def read_archive(archive_path: Path, source_url: str) -> list[dict]:
+def read_archive(archive_path: Path, source_url: str):
+    """Yield rows for the given archive one at a time (generator)."""
     name = archive_path.name
     if name.endswith(".tar.gz") or name.endswith(".tar.bz2") or name.endswith(".tar"):
-        return read_tar(archive_path, source_url)
+        yield from read_tar(archive_path, source_url)
+        return
     if name.endswith(".zip"):
-        return read_zip(archive_path, source_url)
+        yield from read_zip(archive_path, source_url)
+        return
     print(f"  [SKIP] unknown archive format: {name}")
-    return []
 
 
 def is_valid_archive(archive_path: Path) -> bool:
@@ -245,15 +248,28 @@ def read_and_push_batch(
 
     pending_shards: list[tuple[str, str]] = []
     pending_archive_count = 0
+    buffer: list[dict] = []
+
+    def flush_buffer() -> None:
+        nonlocal buffer
+        if buffer:
+            pending_shards.append(write_shard(buffer))
+            buffer = []
+
     for archive_path, source_url in batch_archives:
         print(f"    Reading {archive_path.name} …")
-        rows = read_archive(archive_path, source_url)
-        print(f"    Read {len(rows)} file(s) from {archive_path.name}")
-        if rows:
-            pending_shards.append(write_shard(rows))
+        n_rows = 0
+        for row in read_archive(archive_path, source_url):
+            buffer.append(row)
+            n_rows += 1
+            if len(buffer) >= CHUNK_ROWS:
+                flush_buffer()
+        print(f"    Read {n_rows} file(s) from {archive_path.name}")
+        if n_rows:
             pending_archive_count += 1
-            del rows
         archive_path.unlink(missing_ok=True)
+
+    flush_buffer()
 
     if pending_shards:
         flush_shards(repo_id, pending_shards, pending_archive_count, api)
